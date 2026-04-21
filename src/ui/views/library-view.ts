@@ -44,6 +44,10 @@ export class LibraryView {
   private activeBulkEditor: BulkEditorAction = null;
   private bulkDeckId = "";
   private bulkTagValue = "";
+  private newDeckName = "";
+  private moveDeckName = "";
+  private isDeckEditorOpen = false;
+  private isCreatingDeck = false;
   private isApplyingBulkAction = false;
 
   constructor(
@@ -229,6 +233,36 @@ export class LibraryView {
       cls: "srf-library__subtitle",
       text: "Filter by deck, source, and state. Then act on groups with a dedicated action tray instead of modal prompts.",
     });
+    const actions = copy.createDiv({ cls: "srf-library__hero-actions" });
+    const createDeckBtn = actions.createEl("button", {
+      cls: "srf-btn srf-btn--secondary",
+      text: this.isDeckEditorOpen ? "Hide deck form" : "New Deck",
+    });
+    createDeckBtn.addEventListener("click", () => {
+      this.isDeckEditorOpen = !this.isDeckEditorOpen;
+      void this.render();
+    });
+    const createCardBtn = actions.createEl("button", {
+      cls: "srf-btn srf-btn--ghost",
+      text: "Create Card",
+    });
+    createCardBtn.addEventListener("click", () => this.onCreateCard?.());
+    if (this.isDeckEditorOpen) {
+      this.renderDeckEditor(copy, {
+        value: this.newDeckName,
+        placeholder: "Exam deck, Biology, Japanese...",
+        buttonLabel: "Create deck",
+        onInput: (value) => {
+          this.newDeckName = value;
+        },
+        onCreate: () => this.createDeckFromName(this.newDeckName),
+        onCancel: () => {
+          this.isDeckEditorOpen = false;
+          this.newDeckName = "";
+          void this.render();
+        },
+      });
+    }
 
     const stats = hero.createDiv({ cls: "srf-library__hero-stats" });
     this.renderHeroStat(stats, "Visible cards", String(total));
@@ -371,7 +405,7 @@ export class LibraryView {
   }
 
   private renderMoveEditor(editor: HTMLElement): void {
-    const label = editor.createDiv({ cls: "srf-library__bulk-editor-label", text: "Move selected cards to deck" });
+    editor.createDiv({ cls: "srf-library__bulk-editor-label", text: "Move selected cards to deck" });
     const select = editor.createEl("select", { cls: "srf-select srf-library__bulk-select" }) as HTMLSelectElement;
     this.decks.forEach((deck) => {
       const option = select.createEl("option", { value: deck.id, text: deck.name });
@@ -387,6 +421,21 @@ export class LibraryView {
     });
     apply.disabled = this.isApplyingBulkAction || !this.bulkDeckId;
     apply.addEventListener("click", () => this.applyMove());
+
+    const createInline = editor.createDiv({ cls: "srf-library__bulk-editor-inline" });
+    this.renderDeckEditor(createInline, {
+      value: this.moveDeckName,
+      placeholder: "Create deck then move here",
+      buttonLabel: "Create & select",
+      compact: true,
+      onInput: (value) => {
+        this.moveDeckName = value;
+      },
+      onCreate: () =>
+        this.createDeckFromName(this.moveDeckName, {
+          selectForMove: true,
+        }),
+    });
   }
 
   private renderTagEditor(editor: HTMLElement): void {
@@ -426,6 +475,104 @@ export class LibraryView {
       });
       new Notice("Cards moved.");
     });
+  }
+
+  private renderDeckEditor(
+    container: HTMLElement,
+    opts: {
+      value: string;
+      placeholder: string;
+      buttonLabel: string;
+      compact?: boolean;
+      onInput: (value: string) => void;
+      onCreate: () => void;
+      onCancel?: () => void;
+    }
+  ): void {
+    const form = container.createEl("form", {
+      cls: opts.compact ? "srf-deck-editor srf-deck-editor--compact" : "srf-deck-editor",
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      opts.onCreate();
+    });
+
+    if (!opts.compact) {
+      form.createDiv({
+        cls: "srf-deck-editor__label",
+        text: "Create a deck",
+      });
+    }
+
+    const input = form.createEl("input", {
+      cls: "srf-input srf-deck-editor__input",
+      type: "text",
+      placeholder: opts.placeholder,
+    }) as HTMLInputElement;
+    input.value = opts.value;
+
+    const create = form.createEl("button", {
+      cls: "srf-btn srf-btn--primary",
+      text: opts.buttonLabel,
+      attr: { type: "button" },
+    }) as HTMLButtonElement;
+    const syncState = () => {
+      create.disabled = this.isCreatingDeck || !input.value.trim();
+    };
+    input.addEventListener("input", () => {
+      opts.onInput(input.value);
+      syncState();
+    });
+    syncState();
+    create.addEventListener("click", opts.onCreate);
+
+    if (opts.onCancel) {
+      const cancel = form.createEl("button", {
+        cls: "srf-btn srf-btn--ghost",
+        text: "Cancel",
+        attr: { type: "button" },
+      });
+      cancel.addEventListener("click", opts.onCancel);
+    }
+  }
+
+  private async createDeckFromName(
+    name: string,
+    options: { selectForMove?: boolean } = {}
+  ): Promise<void> {
+    if (this.isCreatingDeck) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      new Notice("Deck name is required.");
+      return;
+    }
+
+    this.isCreatingDeck = true;
+    let shouldRender = false;
+    try {
+      const deck = await this.service.createDeck({ name: trimmed });
+      await this.refreshOptions();
+      if (options.selectForMove) {
+        this.bulkDeckId = deck.id;
+        this.activeBulkEditor = "move";
+      }
+      this.newDeckName = "";
+      this.moveDeckName = "";
+      this.isDeckEditorOpen = false;
+      shouldRender = true;
+      new Notice(`Deck created: ${deck.name}`);
+    } catch (error) {
+      console.error("[SRF] Create deck failed:", error);
+      new Notice(error instanceof Error ? error.message : "Could not create deck.");
+    } finally {
+      this.isCreatingDeck = false;
+    }
+
+    if (shouldRender) {
+      await this.render();
+    } else {
+      this.renderBulkBar();
+    }
   }
 
   private async applyTags(): Promise<void> {

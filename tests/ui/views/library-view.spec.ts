@@ -99,6 +99,12 @@ function makeRow(overrides: Partial<LibraryRow> = {}): LibraryRow {
   };
 }
 
+async function flushDom(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.resolve();
+}
+
 describe("LibraryView", () => {
   beforeEach(() => {
     installObsidianDomHelpers();
@@ -254,6 +260,119 @@ describe("LibraryView", () => {
       action: "move",
       cardIds: ["card-1"],
       deckId: "deck-2",
+    });
+  });
+
+  it("creates a deck from the library hero", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+      createDeck: vi.fn().mockResolvedValue({ id: "deck-new", name: "Exam Deck" }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const newDeckButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "New Deck"
+    ) as HTMLButtonElement | undefined;
+    newDeckButton?.click();
+    await flushDom();
+
+    const input = container.querySelector(".srf-deck-editor__input") as HTMLInputElement;
+    input.value = "Exam Deck";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const createButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Create deck"
+    ) as HTMLButtonElement | undefined;
+    createButton?.click();
+    await flushDom();
+
+    expect(service.createDeck).toHaveBeenCalledWith({ name: "Exam Deck" });
+  });
+
+  it("creates a deck from the move tray and moves the selected card to it", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const options = {
+      decks: [{ id: "default", name: "Default" }],
+      tags: [],
+      sourceFiles: [],
+    };
+    const createdDeck = { id: "deck-created", name: "Exam Deck" };
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 1 }),
+      createDeck: vi.fn().mockImplementation(async () => {
+        options.decks = [...options.decks, createdDeck];
+        return createdDeck;
+      }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      options.decks,
+      options.tags,
+      options.sourceFiles,
+      undefined,
+      undefined,
+      () => options
+    );
+
+    await view.render();
+
+    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const moveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Move"
+    ) as HTMLButtonElement | undefined;
+    moveButton?.click();
+
+    const input = container.querySelector(".srf-deck-editor__input") as HTMLInputElement;
+    input.value = "Exam Deck";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const createButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Create & select"
+    ) as HTMLButtonElement | undefined;
+    createButton?.click();
+    await flushDom();
+
+    const deckSelect = container.querySelector(".srf-library__bulk-select") as HTMLSelectElement;
+    expect(deckSelect.value).toBe("deck-created");
+
+    const applyButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Apply move"
+    ) as HTMLButtonElement | undefined;
+    applyButton?.click();
+    await flushDom();
+
+    expect(service.createDeck).toHaveBeenCalledWith({ name: "Exam Deck" });
+    expect(service.bulkUpdate).toHaveBeenCalledWith({
+      action: "move",
+      cardIds: ["card-1"],
+      deckId: "deck-created",
     });
   });
 

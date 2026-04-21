@@ -1,9 +1,10 @@
 import type { PluginDataRepository } from "../data/plugin-data-repository";
 import type {
+  DeckRecord,
   ReviewCardState,
   TagRecord,
 } from "../domain/models";
-import { nowIso, createTag } from "../domain/models";
+import { nowIso, createDeck, createTag } from "../domain/models";
 
 // ─── I/O types ────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,10 @@ export interface LibraryQueryResult {
   rows: LibraryRow[];
 }
 
+export interface CreateDeckInput {
+  name: string;
+}
+
 export type BulkUpdateCardsInput =
   | { action: "move"; cardIds: string[]; deckId: string }
   | { action: "tag"; cardIds: string[]; tagIds: string[]; createMissingTags?: boolean }
@@ -45,6 +50,34 @@ export type BulkUpdateCardsInput =
 
 export class LibraryService {
   constructor(private readonly repository: PluginDataRepository) {}
+
+  async createDeck(input: CreateDeckInput): Promise<DeckRecord> {
+    const name = input.name.trim();
+    if (!name) {
+      throw new Error("DeckNameRequiredError: deck name is required");
+    }
+
+    let created: DeckRecord | null = null;
+    await this.repository.save((data) => {
+      const duplicate = data.decks.find(
+        (deck) => deck.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (duplicate) {
+        throw new Error("DeckAlreadyExistsError: deck name already exists");
+      }
+
+      created = createDeck({ name });
+      return {
+        ...data,
+        decks: [...data.decks, created],
+      };
+    });
+
+    if (!created) {
+      throw new Error("DeckCreateError: could not create deck");
+    }
+    return created;
+  }
 
   async query(input: LibraryQueryInput): Promise<LibraryQueryResult> {
     const data = await this.repository.load();
@@ -161,6 +194,11 @@ export class LibraryService {
       });
 
       if (input.action === "move") {
+        const targetDeck = data.decks.find((deck) => deck.id === input.deckId && !deck.archived);
+        if (!targetDeck) {
+          throw new Error("DeckNotFoundError: target deck does not exist");
+        }
+
         const templates = data.templates.map((t) => {
           const hasMatchingCard = t.generatedCardIds.some((id) => idSet.has(id));
           if (!hasMatchingCard) return t;

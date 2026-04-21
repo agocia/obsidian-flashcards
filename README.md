@@ -10,6 +10,7 @@ It lets you create cards from note selections, review them on an FSRS schedule, 
 - Support **Basic**, **Reverse**, and **Cloze** card modes
 - Review due cards in a focused full-screen review flow
 - Browse all cards in a filterable **Card Library**
+- Create decks from the library
 - Bulk **move**, **tag**, **suspend**, **unsuspend**, and **delete** cards
 - Open the original source note directly from the builder or library
 - Export and import plugin data as JSON or CSV
@@ -92,6 +93,7 @@ The library is the management surface for the whole collection. It supports:
 
 - search by prompt, answer, deck, tag, and source note
 - filters for deck, tag, state, and source file
+- deck creation from the library header or directly inside the move tray
 - bulk actions through an inline action tray
 - direct jump back to the source note
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { LibraryService } from "../../src/services/library-service";
 import { PluginDataRepository } from "../../src/data/plugin-data-repository";
-import { createReviewCard } from "../../src/domain/models";
+import { createDeck, createReviewCard } from "../../src/domain/models";
 
 function makeRepo() {
   let stored: unknown = undefined;
@@ -170,6 +170,7 @@ describe("LibraryService.bulkUpdate", () => {
 
   it("moves card to new deck", async () => {
     const card = createReviewCard("t1", "forward", "Q", "A");
+    const newDeck = createDeck({ id: "new-deck", name: "New Deck" });
     const template = {
       id: "t1",
       kind: "basic" as const,
@@ -190,13 +191,51 @@ describe("LibraryService.bulkUpdate", () => {
       updatedAt: new Date().toISOString(),
       archived: false,
     };
-    await repo.save((d) => ({ ...d, cards: [card], templates: [template] }));
+    await repo.save((d) => ({
+      ...d,
+      decks: [...d.decks, newDeck],
+      cards: [card],
+      templates: [template],
+    }));
 
     await service.bulkUpdate({ action: "move", cardIds: [card.id], deckId: "new-deck" });
 
     const snap = repo.snapshot();
     const updatedTemplate = snap.templates[0];
     expect(updatedTemplate.deckId).toBe("new-deck");
+  });
+
+  it("rejects moves to a missing deck", async () => {
+    const card = createReviewCard("t1", "forward", "Q", "A");
+    const template = {
+      id: "t1",
+      kind: "basic" as const,
+      deckId: "default",
+      tagIds: [],
+      sourceAnchor: {
+        filePath: "", noteTitle: "", startOffset: 0, endOffset: 0,
+        selectedText: "", leadingContext: "", trailingContext: "",
+        excerpt: "", contentHash: "", lastResolvedAt: new Date().toISOString(),
+      },
+      frontMarkdown: "Q",
+      backMarkdown: "A",
+      clozeMarkdown: null,
+      hintByClozeIndex: {},
+      customTemplateId: null,
+      generatedCardIds: [card.id],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      archived: false,
+    };
+    await repo.save((d) => ({ ...d, cards: [card], templates: [template] }));
+
+    await expect(
+      service.bulkUpdate({
+        action: "move",
+        cardIds: [card.id],
+        deckId: "missing-deck",
+      })
+    ).rejects.toThrow(/DeckNotFoundError/);
   });
 
   it("creates missing tags when bulk tagging", async () => {
@@ -233,5 +272,31 @@ describe("LibraryService.bulkUpdate", () => {
     const snap = repo.snapshot();
     expect(snap.tags.some((tag) => tag.label === "biology")).toBe(true);
     expect(snap.templates[0]?.tagIds).toHaveLength(1);
+  });
+});
+
+describe("LibraryService.createDeck", () => {
+  let repo: PluginDataRepository;
+  let service: LibraryService;
+
+  beforeEach(async () => {
+    repo = makeRepo();
+    await repo.load();
+    service = new LibraryService(repo);
+  });
+
+  it("creates a deck with a trimmed name", async () => {
+    const deck = await service.createDeck({ name: "  Exam Deck  " });
+
+    expect(deck.name).toBe("Exam Deck");
+    expect(repo.snapshot().decks.some((candidate) => candidate.id === deck.id)).toBe(true);
+  });
+
+  it("rejects duplicate deck names case-insensitively", async () => {
+    await service.createDeck({ name: "Biology" });
+
+    await expect(service.createDeck({ name: " biology " })).rejects.toThrow(
+      /DeckAlreadyExistsError/
+    );
   });
 });
