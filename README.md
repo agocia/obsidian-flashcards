@@ -99,8 +99,9 @@ The library is the management surface for the whole collection. It supports:
 - search by prompt, answer, deck, tag, and source note
 - filters for deck, tag, state, and source file
 - deck-directory navigation with paged rendering so large libraries do not mount every card at once
-- deck creation from the library header or directly inside the move tray
+- deck creation and deck renaming from the library
 - bulk actions through an inline action tray
+- direct return to the dashboard
 - direct jump back to the source note
 
 ### Builder Drawer

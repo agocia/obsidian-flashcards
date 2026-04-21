@@ -606,6 +606,12 @@
 
 .srf-library__content {
   padding: 16px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--srf-accent-primary) 4%, var(--srf-surface-glass)),
+      var(--srf-surface-glass) 220px
+    );
 }
 
 .srf-library__filter-bar {
@@ -615,14 +621,19 @@
   background: transparent;
 }
 
+.srf-library__filter-bar .srf-filter-shell {
+  border-color: color-mix(in srgb, var(--srf-accent-primary) 18%, var(--srf-border-subtle));
+  background: color-mix(in srgb, var(--srf-accent-primary) 5%, var(--srf-surface-elevated));
+}
+
 .srf-library__directory {
   display: grid;
   gap: 10px;
   margin: 0 0 16px;
   padding: 12px;
-  border: 1px solid var(--srf-border-subtle);
+  border: 1px solid color-mix(in srgb, var(--srf-success) 20%, var(--srf-border-subtle));
   border-radius: var(--srf-radius-lg);
-  background: color-mix(in srgb, var(--srf-surface-elevated) 66%, transparent);
+  background: color-mix(in srgb, var(--srf-success) 5%, var(--srf-surface-elevated));
 }
 
 .srf-library__directory-header {
@@ -630,6 +641,10 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+}
+
+.srf-library__directory-header-copy {
+  min-width: 0;
 }
 
 .srf-library__directory-title {
@@ -675,13 +690,25 @@
   color: var(--srf-accent-primary);
 }
 
+.srf-library__rename-deck-button {
+  flex: 0 0 auto;
+}
+
+.srf-library__rename-deck-form {
+  border-top: 1px solid color-mix(in srgb, var(--srf-success) 22%, var(--srf-border-subtle));
+  padding-top: 10px;
+}
+
 .srf-library__list-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   margin: 4px 0 14px;
-  padding: 0 2px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--srf-warning) 18%, var(--srf-border-subtle));
+  border-radius: var(--srf-radius-lg);
+  background: color-mix(in srgb, var(--srf-warning) 5%, var(--srf-surface-elevated));
 }
 
 .srf-library__list-count {
@@ -727,6 +754,7 @@
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--srf-border-subtle);
+  border-left: 3px solid color-mix(in srgb, var(--srf-accent-primary) 30%, var(--srf-border-subtle));
   border-radius: var(--srf-radius-lg);
   background: color-mix(in srgb, var(--srf-surface-elevated) 82%, transparent);
   box-shadow: var(--srf-shadow-xs), var(--srf-inner-highlight);

@@ -251,6 +251,109 @@ describe("LibraryView", () => {
     );
   });
 
+  it("renames the selected deck from the directory", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const options = {
+      decks: [
+        { id: "default", name: "Default" },
+        { id: "deck-2", name: "Exam Deck" },
+      ],
+      tags: [],
+      sourceFiles: [],
+    };
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow({ deckName: "Exam Deck" })],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+      renameDeck: vi.fn().mockImplementation(async ({ deckId, name }) => {
+        options.decks = options.decks.map((deck) =>
+          deck.id === deckId ? { ...deck, name } : deck
+        );
+        return { id: deckId, name };
+      }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      options.decks,
+      options.tags,
+      options.sourceFiles,
+      undefined,
+      undefined,
+      () => options
+    );
+
+    await view.render();
+
+    const deckButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Exam Deck"
+    ) as HTMLButtonElement | undefined;
+    deckButton?.click();
+    await flushDom();
+
+    const renameButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Rename Deck"
+    ) as HTMLButtonElement | undefined;
+    renameButton?.click();
+    await flushDom();
+
+    const input = container.querySelector(".srf-library__rename-deck-form input") as HTMLInputElement;
+    input.value = "Renamed Deck";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save name"
+    ) as HTMLButtonElement | undefined;
+    saveButton?.click();
+    await flushDom();
+
+    expect(service.renameDeck).toHaveBeenCalledWith({
+      deckId: "deck-2",
+      name: "Renamed Deck",
+    });
+    expect(container.textContent).toContain("Renamed Deck");
+  });
+
+  it("offers a direct way back to the dashboard", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const onOpenDashboard = vi.fn();
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      [],
+      undefined,
+      undefined,
+      undefined,
+      onOpenDashboard
+    );
+
+    await view.render();
+
+    const dashboardButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Dashboard"
+    ) as HTMLButtonElement | undefined;
+    dashboardButton?.click();
+
+    expect(onOpenDashboard).toHaveBeenCalledOnce();
+  });
+
   it("paginates the library instead of rendering every card at once", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

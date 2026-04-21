@@ -23,6 +23,7 @@ export class LibraryView {
   private tags: Array<{ id: string; label: string }> = [];
   private sourceFiles: string[] = [];
   private onCreateCard?: () => void;
+  private onOpenDashboard?: () => void;
   private onOpenSourceNote?: (filePath: string) => void;
   private loadOptions?: () =>
     | Promise<LibraryViewOptionsPayload>
@@ -48,8 +49,12 @@ export class LibraryView {
   private bulkTagValue = "";
   private newDeckName = "";
   private moveDeckName = "";
+  private renameDeckId = "";
+  private renameDeckName = "";
   private isDeckEditorOpen = false;
   private isCreatingDeck = false;
+  private isRenameDeckEditorOpen = false;
+  private isRenamingDeck = false;
   private isApplyingBulkAction = false;
 
   constructor(
@@ -60,7 +65,8 @@ export class LibraryView {
     sourceFiles: string[] = [],
     onCreateCard?: () => void,
     onOpenSourceNote?: (filePath: string) => void,
-    loadOptions?: () => Promise<LibraryViewOptionsPayload> | LibraryViewOptionsPayload
+    loadOptions?: () => Promise<LibraryViewOptionsPayload> | LibraryViewOptionsPayload,
+    onOpenDashboard?: () => void
   ) {
     this.container = container;
     this.service = service;
@@ -68,6 +74,7 @@ export class LibraryView {
     this.tags = tags;
     this.sourceFiles = sourceFiles;
     this.onCreateCard = onCreateCard;
+    this.onOpenDashboard = onOpenDashboard;
     this.onOpenSourceNote = onOpenSourceNote;
     this.loadOptions = loadOptions;
   }
@@ -247,6 +254,11 @@ export class LibraryView {
       text: "Filter by deck, source, and state. Then act on groups with a dedicated action tray instead of modal prompts.",
     });
     const actions = copy.createDiv({ cls: "srf-library__hero-actions" });
+    const dashboardBtn = actions.createEl("button", {
+      cls: "srf-btn srf-btn--secondary",
+      text: "Dashboard",
+    });
+    dashboardBtn.addEventListener("click", () => this.onOpenDashboard?.());
     const createDeckBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--secondary",
       text: this.isDeckEditorOpen ? "Hide deck form" : "New Deck",
@@ -285,19 +297,43 @@ export class LibraryView {
 
   private renderDeckDirectory(container: HTMLElement): void {
     const selectedDeckId = this.query.deckIds[0] ?? "";
+    const selectedDeck = this.decks.find((deck) => deck.id === selectedDeckId) ?? null;
     const directory = container.createDiv({ cls: "srf-library__directory" });
     const header = directory.createDiv({ cls: "srf-library__directory-header" });
-    header.createDiv({ cls: "srf-library__directory-title", text: "Deck directory" });
-    header.createDiv({
+    const headerCopy = header.createDiv({ cls: "srf-library__directory-header-copy" });
+    headerCopy.createDiv({ cls: "srf-library__directory-title", text: "Deck directory" });
+    headerCopy.createDiv({
       cls: "srf-library__directory-hint",
       text: "Jump by deck without rendering the whole collection at once.",
     });
+    if (selectedDeck) {
+      const renameButton = header.createEl("button", {
+        cls: "srf-btn srf-btn--ghost srf-library__rename-deck-button",
+        text:
+          this.isRenameDeckEditorOpen && this.renameDeckId === selectedDeck.id
+            ? "Hide rename"
+            : "Rename Deck",
+        attr: { type: "button" },
+      });
+      renameButton.addEventListener("click", () => {
+        const isOpenForSelected =
+          this.isRenameDeckEditorOpen && this.renameDeckId === selectedDeck.id;
+        this.isRenameDeckEditorOpen = !isOpenForSelected;
+        this.renameDeckId = isOpenForSelected ? "" : selectedDeck.id;
+        this.renameDeckName = isOpenForSelected ? "" : selectedDeck.name;
+        void this.render();
+      });
+    }
 
     const rail = directory.createDiv({ cls: "srf-library__directory-rail" });
     this.renderDeckDirectoryButton(rail, "All decks", "", !selectedDeckId);
     this.decks.forEach((deck) => {
       this.renderDeckDirectoryButton(rail, deck.name, deck.id, selectedDeckId === deck.id);
     });
+
+    if (selectedDeck && this.isRenameDeckEditorOpen && this.renameDeckId === selectedDeck.id) {
+      this.renderRenameDeckEditor(directory, selectedDeck);
+    }
   }
 
   private renderDeckDirectoryButton(
@@ -348,6 +384,54 @@ export class LibraryView {
     });
 
     this.renderPagination(actions, total);
+  }
+
+  private renderRenameDeckEditor(
+    container: HTMLElement,
+    deck: { id: string; name: string }
+  ): void {
+    const form = container.createEl("form", {
+      cls: "srf-deck-editor srf-deck-editor--compact srf-library__rename-deck-form",
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void this.renameDeck();
+    });
+    const input = form.createEl("input", {
+      cls: "srf-input srf-deck-editor__input",
+      type: "text",
+      placeholder: "Deck name",
+    }) as HTMLInputElement;
+    input.value = this.renameDeckName || deck.name;
+
+    const save = form.createEl("button", {
+      cls: "srf-btn srf-btn--primary",
+      text: "Save name",
+      attr: { type: "button" },
+    }) as HTMLButtonElement;
+    const syncState = () => {
+      const nextName = input.value.trim();
+      save.disabled = this.isRenamingDeck || !nextName || nextName === deck.name;
+    };
+    input.addEventListener("input", () => {
+      this.renameDeckName = input.value;
+      syncState();
+    });
+    save.addEventListener("click", () => void this.renameDeck());
+
+    const cancel = form.createEl("button", {
+      cls: "srf-btn srf-btn--ghost",
+      text: "Cancel",
+      attr: { type: "button" },
+    });
+    cancel.addEventListener("click", () => {
+      this.isRenameDeckEditorOpen = false;
+      this.renameDeckId = "";
+      this.renameDeckName = "";
+      void this.render();
+    });
+
+    syncState();
   }
 
   private renderPagination(container: HTMLElement, total: number): void {
@@ -656,6 +740,39 @@ export class LibraryView {
     }
   }
 
+  private async renameDeck(): Promise<void> {
+    if (this.isRenamingDeck || !this.renameDeckId) return;
+    const trimmed = this.renameDeckName.trim();
+    if (!trimmed) {
+      new Notice("Deck name is required.");
+      return;
+    }
+
+    this.isRenamingDeck = true;
+    let shouldRender = false;
+    try {
+      const renamed = await this.service.renameDeck({
+        deckId: this.renameDeckId,
+        name: trimmed,
+      });
+      await this.refreshOptions();
+      this.renameDeckId = "";
+      this.renameDeckName = "";
+      this.isRenameDeckEditorOpen = false;
+      shouldRender = true;
+      new Notice(`Deck renamed: ${renamed.name}`);
+    } catch (error) {
+      console.error("[SRF] Rename deck failed:", error);
+      new Notice(error instanceof Error ? error.message : "Could not rename deck.");
+    } finally {
+      this.isRenamingDeck = false;
+    }
+
+    if (shouldRender) {
+      await this.render();
+    }
+  }
+
   private async applyTags(): Promise<void> {
     const tagIds = this.bulkTagValue
       .split(",")
@@ -753,6 +870,11 @@ export class LibraryView {
 
   private async update(partial: Partial<LibraryQueryInput>): Promise<void> {
     this.query = { ...this.query, ...partial };
+    if ("deckIds" in partial) {
+      this.isRenameDeckEditorOpen = false;
+      this.renameDeckId = "";
+      this.renameDeckName = "";
+    }
     this.pageIndex = 0;
     this.selectedRowIds.clear();
     this.activeBulkEditor = null;

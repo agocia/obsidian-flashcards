@@ -42,6 +42,11 @@ export interface CreateDeckInput {
   name: string;
 }
 
+export interface RenameDeckInput {
+  deckId: string;
+  name: string;
+}
+
 export type BulkUpdateCardsInput =
   | { action: "move"; cardIds: string[]; deckId: string }
   | { action: "tag"; cardIds: string[]; tagIds: string[]; createMissingTags?: boolean }
@@ -79,6 +84,45 @@ export class LibraryService {
       throw new Error("DeckCreateError: could not create deck");
     }
     return created;
+  }
+
+  async renameDeck(input: RenameDeckInput): Promise<DeckRecord> {
+    const name = input.name.trim();
+    if (!name) {
+      throw new Error("DeckNameRequiredError: deck name is required");
+    }
+
+    const now = nowIso();
+    let renamed: DeckRecord | null = null;
+    await this.repository.save((data) => {
+      const existing = data.decks.find((deck) => deck.id === input.deckId && !deck.archived);
+      if (!existing) {
+        throw new Error("DeckNotFoundError: deck does not exist");
+      }
+
+      const duplicate = data.decks.find(
+        (deck) =>
+          deck.id !== input.deckId &&
+          !deck.archived &&
+          deck.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (duplicate) {
+        throw new Error("DeckAlreadyExistsError: deck name already exists");
+      }
+
+      const decks = data.decks.map((deck) => {
+        if (deck.id !== input.deckId) return deck;
+        renamed = { ...deck, name, updatedAt: now };
+        return renamed;
+      });
+
+      return { ...data, decks };
+    });
+
+    if (!renamed) {
+      throw new Error("DeckRenameError: could not rename deck");
+    }
+    return renamed;
   }
 
   async query(input: LibraryQueryInput): Promise<LibraryQueryResult> {

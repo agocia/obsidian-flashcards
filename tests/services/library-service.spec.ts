@@ -318,3 +318,40 @@ describe("LibraryService.createDeck", () => {
     );
   });
 });
+
+describe("LibraryService.renameDeck", () => {
+  let repo: PluginDataRepository;
+  let service: LibraryService;
+
+  beforeEach(async () => {
+    repo = makeRepo();
+    await repo.load();
+    service = new LibraryService(repo);
+  });
+
+  it("renames an existing deck with a trimmed name", async () => {
+    const deck = await service.createDeck({ name: "Biology" });
+
+    const renamed = await service.renameDeck({
+      deckId: deck.id,
+      name: "  Cell Biology  ",
+    });
+
+    expect(renamed.name).toBe("Cell Biology");
+    expect(repo.snapshot().decks.find((candidate) => candidate.id === deck.id)?.name).toBe(
+      "Cell Biology"
+    );
+  });
+
+  it("rejects renaming a deck to a duplicate name", async () => {
+    const biology = await service.createDeck({ name: "Biology" });
+    await service.createDeck({ name: "Chemistry" });
+
+    await expect(
+      service.renameDeck({
+        deckId: biology.id,
+        name: " chemistry ",
+      })
+    ).rejects.toThrow(/DeckAlreadyExistsError/);
+  });
+});

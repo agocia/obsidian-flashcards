@@ -182,6 +182,7 @@ class SRFLibraryLeaf extends ItemView {
     private service: LibraryService,
     private repository: PluginDataRepository,
     private onCreateCard: () => void,
+    private onOpenDashboard: () => void,
     private onOpenSourceNote: (filePath: string) => void
   ) {
     super(leaf);
@@ -220,7 +221,8 @@ class SRFLibraryLeaf extends ItemView {
               ),
             ],
           };
-        }
+        },
+        () => this.onOpenDashboard()
       );
       await this.view.render();
     } catch (error) {
@@ -363,6 +365,7 @@ export default class FlashcardsPlugin extends Plugin {
         this.libraryService,
         this.repository,
         () => this.openBlankBuilder(),
+        () => void this.router.openDashboard(),
         (filePath) => void this.openSourceNote(filePath)
       )
     );
