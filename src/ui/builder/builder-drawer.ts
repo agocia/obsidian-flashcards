@@ -2,6 +2,7 @@ import { Notice } from "obsidian";
 import type { PluginDataRepository } from "../../data/plugin-data-repository";
 import type { SelectionContext } from "../../data/source-anchor-resolver";
 import type { CardBuilderService, PreviewCardPayload } from "../../services/card-builder-service";
+import type { DeckService } from "../../services/deck-service";
 import type { GenerateTemplateInput } from "../../parsing/template-generator";
 
 /**
@@ -12,9 +13,11 @@ export class BuilderDrawer {
   private container: HTMLElement | null = null;
   private service: CardBuilderService;
   private repository: PluginDataRepository;
+  private deckService: DeckService;
   private selectionContext?: SelectionContext;
-  private onCreated?: () => void;
+  private onDataChanged?: () => void | Promise<void>;
   private onOpenSourceNote?: (filePath: string) => void;
+  private onManageDecks?: () => void;
   private onRequestClose?: () => void;
   private previewTimer: number | null = null;
 
@@ -23,17 +26,24 @@ export class BuilderDrawer {
   private backMarkdown = "";
   private clozeMarkdown = "";
   private deckId = "";
+  private isCreatingDeck = false;
+  private newDeckName = "";
+  private newDeckParentId: string | null = null;
 
   constructor(
     service: CardBuilderService,
     repository: PluginDataRepository,
-    onCreated?: () => void,
-    onOpenSourceNote?: (filePath: string) => void
+    deckService: DeckService,
+    onDataChanged?: () => void | Promise<void>,
+    onOpenSourceNote?: (filePath: string) => void,
+    onManageDecks?: () => void
   ) {
     this.service = service;
     this.repository = repository;
-    this.onCreated = onCreated;
+    this.deckService = deckService;
+    this.onDataChanged = onDataChanged;
     this.onOpenSourceNote = onOpenSourceNote;
+    this.onManageDecks = onManageDecks;
   }
 
   mount(container: HTMLElement, onRequestClose?: () => void): void {
@@ -57,11 +67,14 @@ export class BuilderDrawer {
     this.selectionContext = selectionContext;
 
     const settings = this.repository.snapshot().settings;
-    this.deckId = settings.defaultDeckId;
+    this.deckId = this.deckService.getDefaultDeckId() || settings.defaultDeckId;
     this.mode = modeOverride ?? settings.defaultCardMode;
     this.frontMarkdown = "";
     this.backMarkdown = "";
     this.clozeMarkdown = "";
+    this.isCreatingDeck = false;
+    this.newDeckName = "";
+    this.newDeckParentId = this.deckId || null;
 
     if (selectionContext) {
       const text = selectionContext.fileContent.slice(
@@ -155,20 +168,90 @@ export class BuilderDrawer {
     formCol.createEl("h3", { cls: "srf-builder-drawer__col-heading", text: "Card content" });
     const form = formCol.createEl("form", { cls: "srf-builder-drawer__form" });
 
-    const deckLabel = form.createEl("label", { cls: "srf-form-label" });
+    const deckOptions = this.deckService.getDeckOptions();
+    if (!deckOptions.some((deck) => deck.id === this.deckId)) {
+      this.deckId = deckOptions[0]?.id ?? "";
+    }
+
+    const deckHeader = form.createDiv({ cls: "srf-builder-drawer__deck-header" });
+    const deckLabel = deckHeader.createEl("label", { cls: "srf-form-label" });
     deckLabel.textContent = "Deck";
+    const deckTools = deckHeader.createDiv({ cls: "srf-builder-drawer__deck-tools" });
+    const newDeckBtn = deckTools.createEl("button", {
+      cls: `srf-btn ${this.isCreatingDeck ? "srf-btn--ghost" : "srf-btn--secondary"}`,
+      text: this.isCreatingDeck ? "Cancel" : "New deck",
+      attr: { type: "button" },
+    });
+    newDeckBtn.addEventListener("click", () => {
+      this.isCreatingDeck = !this.isCreatingDeck;
+      if (this.isCreatingDeck) {
+        this.newDeckName = "";
+        this.newDeckParentId = this.deckId || null;
+      }
+      this.render();
+    });
+    const manageDecksBtn = deckTools.createEl("button", {
+      cls: "srf-btn srf-btn--ghost",
+      text: "Manage decks",
+      attr: { type: "button" },
+    });
+    manageDecksBtn.addEventListener("click", () => this.onManageDecks?.());
+
     const deckSelect = form.createEl("select", { cls: "srf-select" }) as HTMLSelectElement;
-    this.repository
-      .snapshot()
-      .decks
-      .filter((deck) => !deck.archived)
-      .forEach((deck) => {
-        const option = deckSelect.createEl("option", { value: deck.id, text: deck.name });
-        if (deck.id === this.deckId) option.selected = true;
-      });
+    deckOptions.forEach((deck) => {
+      const option = deckSelect.createEl("option", { value: deck.id, text: deck.label });
+      if (deck.id === this.deckId) option.selected = true;
+    });
     deckSelect.addEventListener("change", () => {
       this.deckId = deckSelect.value;
     });
+
+    if (this.isCreatingDeck) {
+      const deckCreate = form.createDiv({ cls: "srf-builder-drawer__deck-create" });
+
+      const nameField = deckCreate.createDiv({ cls: "srf-builder-drawer__deck-create-field" });
+      const nameLabel = nameField.createEl("label", { cls: "srf-form-label" });
+      nameLabel.textContent = "New deck name";
+      const nameInput = nameField.createEl("input", {
+        cls: "srf-input",
+        type: "text",
+        placeholder: "Deck name",
+      }) as HTMLInputElement;
+      nameInput.value = this.newDeckName;
+      nameInput.addEventListener("input", () => {
+        this.newDeckName = nameInput.value;
+      });
+
+      const parentField = deckCreate.createDiv({ cls: "srf-builder-drawer__deck-create-field" });
+      const parentLabel = parentField.createEl("label", { cls: "srf-form-label" });
+      parentLabel.textContent = "Parent deck";
+      const parentSelect = parentField.createEl("select", {
+        cls: "srf-select",
+      }) as HTMLSelectElement;
+      const rootOption = parentSelect.createEl("option", {
+        value: "",
+        text: "No parent deck",
+      });
+      if (!this.newDeckParentId) rootOption.selected = true;
+      deckOptions.forEach((deck) => {
+        const option = parentSelect.createEl("option", {
+          value: deck.id,
+          text: deck.label,
+        });
+        if (deck.id === this.newDeckParentId) option.selected = true;
+      });
+      parentSelect.addEventListener("change", () => {
+        this.newDeckParentId = parentSelect.value || null;
+      });
+
+      const createActions = deckCreate.createDiv({ cls: "srf-builder-drawer__deck-create-actions" });
+      const createBtn = createActions.createEl("button", {
+        cls: "srf-btn srf-btn--primary",
+        text: "Create deck",
+        attr: { type: "button" },
+      });
+      createBtn.addEventListener("click", () => void this.createDeckInline());
+    }
 
     if (this.mode === "cloze") {
       const clozeLabel = form.createEl("label", { cls: "srf-form-label" });
@@ -328,7 +411,7 @@ export class BuilderDrawer {
         backMarkdown: this.backMarkdown,
         clozeMarkdown: this.mode === "cloze" ? this.clozeMarkdown : undefined,
       });
-      this.onCreated?.();
+      await Promise.resolve(this.onDataChanged?.());
       new Notice("Card saved.");
 
       if (addAnother) {
@@ -349,6 +432,25 @@ export class BuilderDrawer {
   close(): void {
     this.clearRendered();
     this.onRequestClose?.();
+  }
+
+  private async createDeckInline(): Promise<void> {
+    try {
+      const deck = await this.deckService.createDeck({
+        name: this.newDeckName,
+        parentDeckId: this.newDeckParentId,
+      });
+      this.deckId = deck.id;
+      this.isCreatingDeck = false;
+      this.newDeckName = "";
+      this.newDeckParentId = deck.id;
+      await Promise.resolve(this.onDataChanged?.());
+      new Notice(`Created deck: ${deck.name}`);
+      this.render();
+    } catch (error) {
+      console.error("[SRF] Create deck failed:", error);
+      new Notice(error instanceof Error ? error.message : "Could not create deck.");
+    }
   }
 
   private clearRendered(): void {

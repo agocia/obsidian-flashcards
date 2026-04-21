@@ -1,5 +1,6 @@
 import type { PluginDataRepository } from "../data/plugin-data-repository";
 import type { PluginData, ReviewCardRecord, ReviewLogRecord } from "../domain/models";
+import { getDeckLabel, listDeckOptions, sanitizeDeckSelection } from "../domain/deck-utils";
 import { countDueToday, countNewCards } from "../scheduling/review-queue";
 
 // ─── Output type ──────────────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ export interface DashboardStats {
   nextReviewBlockAt: string | null;
   continueDeckId: string | null;
   continueDeckName: string | null;
+  reviewDecks: Array<{ id: string; label: string }>;
   recentlyAddedCardIds: string[];
   needsAttentionCardIds: string[];
 }
@@ -23,20 +25,29 @@ export class DashboardService {
 
   getStats(now: Date = new Date()): DashboardStats {
     const data = this.repository.snapshot();
-    const continueDeckId = data.sessionDraft?.deckIds?.[0] ?? null;
-    const continueDeckName =
-      data.decks.find((deck) => deck.id === continueDeckId)?.name ?? continueDeckId;
+    const sessionDeckIds = sanitizeDeckSelection(data.decks, data.sessionDraft?.deckIds);
+    const continueDeckId = sessionDeckIds[0] ?? null;
+    const continueDeckName = data.sessionDraft
+      ? sessionDeckIds.length === 0
+        ? "All decks"
+        : getDeckLabel(data.decks, continueDeckId)
+      : null;
+    const activeCardIds = getActiveDeckCardIds(data);
 
     return {
-      dueToday: countDueToday(data.cards, now),
-      newCards: countNewCards(data.cards),
+      dueToday: countDueToday(data, now),
+      newCards: countNewCards(data),
       retention30d: calculateRetention30d(data.logs, now),
       streakDays: calculateStreakDays(data.logs, now),
       nextReviewBlockAt: nextReviewBlockIso(now, data.settings.nextReviewBlockHour),
       continueDeckId,
       continueDeckName,
-      recentlyAddedCardIds: findRecentlyAdded(data.cards, now),
-      needsAttentionCardIds: findNeedsAttention(data.cards),
+      reviewDecks: listDeckOptions(data.decks).map((deck) => ({
+        id: deck.id,
+        label: deck.label,
+      })),
+      recentlyAddedCardIds: findRecentlyAdded(data.cards, activeCardIds, now),
+      needsAttentionCardIds: findNeedsAttention(data.cards, activeCardIds),
     };
   }
 }
@@ -87,22 +98,61 @@ function nextReviewBlockIso(now: Date, blockHour: number): string | null {
   return tomorrow.toISOString();
 }
 
-function findRecentlyAdded(cards: ReviewCardRecord[], now: Date): string[] {
+function findRecentlyAdded(
+  cards: ReviewCardRecord[],
+  activeCardIds: Set<string>,
+  now: Date
+): string[] {
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - 7);
   const cutoffIso = cutoff.toISOString();
 
   return cards
-    .filter((c) => c.createdAt >= cutoffIso && !c.suspended)
+    .filter((c) => activeCardIds.has(c.id) && c.createdAt >= cutoffIso && !c.suspended)
     .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
     .slice(0, 10)
     .map((c) => c.id);
 }
 
-function findNeedsAttention(cards: ReviewCardRecord[]): string[] {
+function findNeedsAttention(
+  cards: ReviewCardRecord[],
+  activeCardIds: Set<string>
+): string[] {
   return cards
-    .filter((c) => !c.suspended && c.lapses >= 3)
+    .filter((c) => activeCardIds.has(c.id) && !c.suspended && c.lapses >= 3)
     .sort((a, b) => b.lapses - a.lapses)
     .slice(0, 10)
     .map((c) => c.id);
+}
+
+function getActiveDeckCardIds(
+  data: Pick<PluginData, "cards" | "templates" | "decks">
+): Set<string> {
+  if (data.decks.length === 0 || data.templates.length === 0) {
+    return new Set(data.cards.map((card) => card.id));
+  }
+
+  const activeDeckIds = new Set(
+    data.decks.filter((deck) => !deck.archived).map((deck) => deck.id)
+  );
+
+  const templatedCardIds = new Set<string>();
+  const activeCardIds = new Set<string>();
+
+  data.templates.forEach((template) => {
+    template.generatedCardIds.forEach((cardId) => {
+      templatedCardIds.add(cardId);
+      if (activeDeckIds.has(template.deckId)) {
+        activeCardIds.add(cardId);
+      }
+    });
+  });
+
+  data.cards.forEach((card) => {
+    if (!templatedCardIds.has(card.id)) {
+      activeCardIds.add(card.id);
+    }
+  });
+
+  return activeCardIds;
 }

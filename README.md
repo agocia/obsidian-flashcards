@@ -10,6 +10,8 @@ It lets you create cards from note selections, review them on an FSRS schedule, 
 - Support **Basic**, **Reverse**, and **Cloze** card modes
 - Review due cards in a focused full-screen review flow
 - Browse all cards in a filterable **Card Library**
+- Create, nest, archive, restore, and delete decks from plugin settings
+- Pick a review target deck from the dashboard and capture into full-path deck selectors
 - Bulk **move**, **tag**, **suspend**, **unsuspend**, and **delete** cards
 - Open the original source note directly from the builder or library
 - Export and import plugin data as JSON or CSV
@@ -71,7 +73,7 @@ For active plugin development, point your vault plugin folder at this repo and r
 3. Run **Create Card from Selection or Current Line**
 4. Save the card from the right-side builder drawer
 5. Open **Flashcards** from the ribbon
-6. Start a review session from the dashboard
+6. Start a review session from the dashboard, optionally scoped to a single deck
 
 ## Main UI surfaces
 
@@ -86,6 +88,8 @@ The dashboard is the plugin home screen. It shows:
 - next review block
 - problem-card signals
 
+It also lets you choose whether to review all decks or a specific active deck before starting the session.
+
 ### Card Library
 
 The library is the management surface for the whole collection. It supports:
@@ -99,6 +103,12 @@ The library is the management surface for the whole collection. It supports:
 
 The builder opens in Obsidian's right sidebar so it behaves like a native side panel. It is designed for quick capture while keeping the source note visible and reachable.
 
+From the builder you can:
+
+- capture into any active deck using full deck paths
+- create a new deck inline without leaving the drawer
+- jump straight into the deck manager in plugin settings
+
 ### Review View
 
 The review view is the focused study surface. It supports:
@@ -106,6 +116,16 @@ The review view is the focused study surface. It supports:
 - space to reveal
 - `1` / `2` / `3` / `4` rating shortcuts
 - FSRS schedule previews before rating
+- full deck-path labels so subdeck context stays visible during review
+
+### Deck Management
+
+Decks now behave more like a modern Anki workflow:
+
+- nested deck hierarchies render with full paths such as `Languages :: Japanese`
+- archived decks stay out of active review queues and deck selectors
+- deleting a deck safely reassigns its cards to the fallback default deck
+- the plugin keeps invalid default-deck and session-deck references cleaned up automatically
 
 ## Architecture
 
@@ -116,6 +136,7 @@ The codebase is organized into small layers so data rules, scheduling rules, and
 `src/domain/`
 
 - `models.ts` defines the persistent records and defaults
+- `deck-utils.ts` resolves deck paths, hierarchy helpers, and selector labels
 - `schemas.ts` validates stored plugin data
 
 This is the single source of truth for the stored card/deck/tag/session shapes.
@@ -135,6 +156,7 @@ This layer isolates persistence and migration logic from UI and business logic.
 `src/services/`
 
 - `card-builder-service.ts`
+- `deck-service.ts`
 - `dashboard-service.ts`
 - `library-service.ts`
 - `review-session-service.ts`

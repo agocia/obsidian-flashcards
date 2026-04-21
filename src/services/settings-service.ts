@@ -1,5 +1,6 @@
 import type { PluginDataRepository } from "../data/plugin-data-repository";
 import type { PluginSettings } from "../domain/models";
+import { getDeckPathMap } from "../domain/deck-utils";
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ export class SettingsService {
   async exportCsv(): Promise<string> {
     const data = await this.repository.load();
     const templateMap = new Map(data.templates.map((template) => [template.id, template]));
-    const deckMap = new Map(data.decks.map((deck) => [deck.id, deck.name]));
+    const deckMap = getDeckPathMap(data.decks, { includeArchivedSuffix: true });
     const tagMap = new Map(data.tags.map((tag) => [tag.id, tag.label]));
 
     const rows = data.cards.map((card) => {

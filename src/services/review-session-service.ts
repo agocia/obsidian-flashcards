@@ -7,6 +7,7 @@ import {
   type ReviewRating,
 } from "../domain/models";
 import type { PluginDataRepository } from "../data/plugin-data-repository";
+import { sanitizeDeckSelection } from "../domain/deck-utils";
 import { buildReviewQueue } from "../scheduling/review-queue";
 import { scheduleReview, previewSchedule } from "../scheduling/fsrs-scheduler";
 
@@ -52,15 +53,16 @@ export class ReviewSessionService {
 
   async start(input: StartReviewInput = {}): Promise<ReviewSessionPayload> {
     const data = await this.repository.load();
+    const deckIds = sanitizeDeckSelection(data.decks, input.deckIds);
     const queue = buildReviewQueue(data, {
-      deckIds: input.deckIds,
+      deckIds,
       includeNewCards: input.includeNewCards ?? true,
       now: new Date(),
       newCardsPerDay: data.settings.newCardsPerDay,
       maxReviewsPerDay: data.settings.maxReviewsPerDay,
     });
 
-    const session = createSessionDraft(queue.map((c) => c.id), input.deckIds ?? []);
+    const session = createSessionDraft(queue.map((c) => c.id), deckIds);
 
     await this.repository.save((d) => ({ ...d, sessionDraft: session }));
 

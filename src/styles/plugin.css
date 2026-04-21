@@ -417,6 +417,43 @@
   line-height: 1.55;
 }
 
+.srf-dashboard__target-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  gap: 14px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--srf-border-subtle);
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-surface-elevated) 72%, transparent);
+}
+
+.srf-dashboard__target-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.srf-dashboard__target-label {
+  color: var(--srf-text-tertiary);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.srf-dashboard__target-hint {
+  color: var(--srf-text-primary);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1.42;
+}
+
+.srf-dashboard__target-select {
+  width: 100%;
+}
+
 .srf-dashboard__focus-actions {
   display: flex;
   gap: 10px;
@@ -1279,6 +1316,39 @@
   gap: 10px;
 }
 
+.srf-builder-drawer__deck-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.srf-builder-drawer__deck-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.srf-builder-drawer__deck-create {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--srf-border-subtle);
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-surface-elevated) 78%, transparent);
+}
+
+.srf-builder-drawer__deck-create-field {
+  display: grid;
+  gap: 6px;
+}
+
+.srf-builder-drawer__deck-create-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .srf-builder-drawer__actions {
   display: flex;
   flex-wrap: wrap;
@@ -1343,6 +1413,28 @@
   gap: 16px;
 }
 
+.srf-settings__hero {
+  padding: 24px;
+}
+
+.srf-settings__title {
+  margin: 4px 0 0;
+  color: var(--srf-text-primary);
+  font-family: var(--srf-font-display);
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.srf-settings__subtitle {
+  max-width: 58ch;
+  margin: 10px 0 0;
+  color: var(--srf-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .srf-settings__group {
   padding: 20px;
 }
@@ -1379,6 +1471,10 @@
   background: color-mix(in srgb, var(--srf-surface-elevated) 66%, transparent);
 }
 
+.srf-settings__row-copy {
+  min-width: 0;
+}
+
 .srf-settings__label {
   color: var(--srf-text-primary);
   font-size: 13px;
@@ -1392,6 +1488,78 @@
 
 .srf-settings__toggle {
   justify-self: end;
+}
+
+.srf-settings__deck-creator,
+.srf-settings__deck-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--srf-border-subtle);
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-surface-elevated) 72%, transparent);
+}
+
+.srf-settings__deck-card--archived {
+  opacity: 0.88;
+}
+
+.srf-settings__deck-helper,
+.srf-settings__deck-card-meta {
+  color: var(--srf-text-secondary);
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.srf-settings__deck-list {
+  display: grid;
+  gap: 12px;
+}
+
+.srf-settings__deck-card-header,
+.srf-settings__deck-card-title-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.srf-settings__deck-card-path {
+  color: var(--srf-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.srf-settings__deck-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.srf-settings__deck-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.srf-settings__deck-field {
+  display: grid;
+  gap: 6px;
+}
+
+.srf-settings__deck-field .srf-settings__input,
+.srf-settings__deck-field .srf-settings__select,
+.srf-settings__deck-actions--create {
+  width: 100%;
+}
+
+.srf-settings__deck-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.srf-settings__deck-actions--create {
+  align-items: end;
 }
 
 /* Animations and responsive */
@@ -1425,6 +1593,11 @@
 
   .srf-library-card__meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .srf-dashboard__target-row,
+  .srf-settings__deck-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1475,5 +1648,14 @@
   .srf-dashboard__actions .srf-btn,
   .srf-dashboard__focus-actions .srf-btn {
     flex: 1 1 auto;
+  }
+
+  .srf-builder-drawer__deck-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .srf-builder-drawer__deck-tools {
+    justify-content: flex-start;
   }
 }

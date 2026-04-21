@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ReviewSessionService } from "../../src/services/review-session-service";
 import { PluginDataRepository } from "../../src/data/plugin-data-repository";
+import { createDeck } from "../../src/domain/models";
 import { createReviewCard } from "../../src/domain/models";
 
 function makeRepo() {
@@ -94,5 +95,57 @@ describe("ReviewSessionService", () => {
     const snap = repo.snapshot();
     expect(snap.logs.length).toBeGreaterThanOrEqual(1);
     expect(snap.logs[0].sessionId).toBe(session.id);
+  });
+
+  it("skips cards in archived decks when starting a session", async () => {
+    const archivedDeck = createDeck({
+      id: "deck-archived",
+      name: "Archived Deck",
+      archived: true,
+    });
+    const due = {
+      ...createReviewCard("t-archived", "forward", "Q", "A"),
+      state: "review" as const,
+      dueAt: past,
+    };
+
+    await repo.save((data) => ({
+      ...data,
+      decks: [...data.decks, archivedDeck],
+      templates: [
+        {
+          id: "t-archived",
+          kind: "basic" as const,
+          deckId: archivedDeck.id,
+          tagIds: [],
+          sourceAnchor: {
+            filePath: "notes/Archive.md",
+            noteTitle: "Archive",
+            startOffset: 0,
+            endOffset: 1,
+            selectedText: "Q",
+            leadingContext: "",
+            trailingContext: "",
+            excerpt: "Q",
+            contentHash: "hash",
+            lastResolvedAt: new Date().toISOString(),
+          },
+          frontMarkdown: "Q",
+          backMarkdown: "A",
+          clozeMarkdown: null,
+          hintByClozeIndex: {},
+          customTemplateId: null,
+          generatedCardIds: [due.id],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          archived: false,
+        },
+      ],
+      cards: [due],
+    }));
+
+    const payload = await service.start({ deckIds: [], includeNewCards: true });
+    expect(payload.currentCard).toBeNull();
+    expect(payload.remainingCount).toBe(0);
   });
 });

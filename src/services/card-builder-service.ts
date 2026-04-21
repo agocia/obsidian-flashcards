@@ -9,6 +9,7 @@ import {
   type SelectionContext,
 } from "../data/source-anchor-resolver";
 import { nowIso } from "../domain/models";
+import { resolveDefaultDeckId } from "../domain/deck-utils";
 
 // ─── I/O types ────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,8 @@ export class CardBuilderService {
   async createFromSelection(
     input: CreateFromSelectionInput
   ): Promise<GenerateTemplateResult> {
+    const data = await this.repository.load();
+
     if (!input.selectionContext.fileContent.trim()) {
       throw new Error("SelectionEmptyError: file content is empty");
     }
@@ -55,7 +58,9 @@ export class CardBuilderService {
 
     const result = generateTemplate({
       mode: input.mode,
-      deckId: input.deckId,
+      deckId: data.decks.some((deck) => deck.id === input.deckId && !deck.archived)
+        ? input.deckId
+        : resolveDefaultDeckId(data.decks, data.settings.defaultDeckId),
       tagIds: input.tagIds,
       sourceAnchor: anchor,
       frontMarkdown: input.frontMarkdown ?? selectedText,
@@ -65,10 +70,10 @@ export class CardBuilderService {
       customTemplateId: input.customTemplateId,
     });
 
-    await this.repository.save((data) => ({
-      ...data,
-      templates: [...data.templates, result.template],
-      cards: [...data.cards, ...result.cards],
+    await this.repository.save((current) => ({
+      ...current,
+      templates: [...current.templates, result.template],
+      cards: [...current.cards, ...result.cards],
     }));
 
     return result;

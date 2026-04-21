@@ -11,22 +11,26 @@ export const DASHBOARD_VIEW_TYPE = "srf-dashboard";
 export class DashboardView {
   private container: HTMLElement;
   private service: DashboardService;
-  private onStartReview?: () => void;
+  private onStartReview?: (deckIds?: string[]) => void;
   private onCreateCard?: () => void;
   private onOpenLibrary?: () => void;
+  private onManageDecks?: () => void;
+  private selectedDeckId = "";
 
   constructor(
     container: HTMLElement,
     service: DashboardService,
-    onStartReview?: () => void,
+    onStartReview?: (deckIds?: string[]) => void,
     onCreateCard?: () => void,
-    onOpenLibrary?: () => void
+    onOpenLibrary?: () => void,
+    onManageDecks?: () => void
   ) {
     this.container = container;
     this.service = service;
     this.onStartReview = onStartReview;
     this.onCreateCard = onCreateCard;
     this.onOpenLibrary = onOpenLibrary;
+    this.onManageDecks = onManageDecks;
   }
 
   async render(): Promise<void> {
@@ -43,6 +47,21 @@ export class DashboardView {
         body: "Check the plugin data or reload Obsidian.",
       });
       return;
+    }
+
+    if (
+      this.selectedDeckId &&
+      !stats.reviewDecks.some((deck) => deck.id === this.selectedDeckId)
+    ) {
+      this.selectedDeckId = "";
+    }
+
+    if (
+      !this.selectedDeckId &&
+      stats.continueDeckId &&
+      stats.reviewDecks.some((deck) => deck.id === stats.continueDeckId)
+    ) {
+      this.selectedDeckId = stats.continueDeckId;
     }
 
     const hero = this.container.createDiv({ cls: "srf-panel srf-dashboard__hero" });
@@ -62,7 +81,7 @@ export class DashboardView {
       cls: "srf-btn srf-btn--primary",
       text: stats.dueToday > 0 ? "Start Review" : "Open Review",
     });
-    startBtn.addEventListener("click", () => this.onStartReview?.());
+    startBtn.addEventListener("click", () => this.startReview());
 
     const libraryBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--secondary",
@@ -137,14 +156,49 @@ export class DashboardView {
             ? `You have ${stats.dueToday} due card${stats.dueToday === 1 ? "" : "s"} waiting.`
             : `No due cards yet, but ${stats.newCards} new card${stats.newCards === 1 ? "" : "s"} can be introduced.`,
       });
+      const target = focusCard.createDiv({ cls: "srf-dashboard__target-row" });
+      const targetCopy = target.createDiv({ cls: "srf-dashboard__target-copy" });
+      targetCopy.createDiv({ cls: "srf-dashboard__target-label", text: "Review target" });
+      const targetHint = targetCopy.createDiv({
+        cls: "srf-dashboard__target-hint",
+        text: this.selectedDeckId
+          ? stats.reviewDecks.find((deck) => deck.id === this.selectedDeckId)?.label ?? "Selected deck"
+          : "All active decks",
+      });
+      const targetSelect = target.createEl("select", {
+        cls: "srf-select srf-dashboard__target-select",
+      }) as HTMLSelectElement;
+      const allDecksOption = targetSelect.createEl("option", {
+        value: "",
+        text: "All decks",
+      });
+      if (!this.selectedDeckId) allDecksOption.selected = true;
+      stats.reviewDecks.forEach((deck) => {
+        const option = targetSelect.createEl("option", {
+          value: deck.id,
+          text: deck.label,
+        });
+        if (deck.id === this.selectedDeckId) option.selected = true;
+      });
+      targetSelect.addEventListener("change", () => {
+        this.selectedDeckId = targetSelect.value;
+        targetHint.textContent = this.selectedDeckId
+          ? stats.reviewDecks.find((deck) => deck.id === this.selectedDeckId)?.label ?? "Selected deck"
+          : "All active decks";
+      });
       const focusActions = focusCard.createDiv({ cls: "srf-dashboard__focus-actions" });
       const reviewBtn = focusActions.createEl("button", {
         cls: "srf-btn srf-btn--primary srf-dashboard__start-btn",
         text: "Start Review",
       });
-      reviewBtn.addEventListener("click", () => this.onStartReview?.());
-      const libraryAction = focusActions.createEl("button", {
+      reviewBtn.addEventListener("click", () => this.startReview());
+      const manageDecksBtn = focusActions.createEl("button", {
         cls: "srf-btn srf-btn--secondary",
+        text: "Manage Decks",
+      });
+      manageDecksBtn.addEventListener("click", () => this.onManageDecks?.());
+      const libraryAction = focusActions.createEl("button", {
+        cls: "srf-btn srf-btn--ghost",
         text: "Tidy Library",
       });
       libraryAction.addEventListener("click", () => this.onOpenLibrary?.());
@@ -183,6 +237,10 @@ export class DashboardView {
         ? "Repeated lapses suggest these cards need editing or splitting."
         : "No problem cards are standing out right now."
     );
+  }
+
+  private startReview(): void {
+    this.onStartReview?.(this.selectedDeckId ? [this.selectedDeckId] : []);
   }
 }
 

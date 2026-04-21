@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { LibraryService } from "../../src/services/library-service";
 import { PluginDataRepository } from "../../src/data/plugin-data-repository";
-import { createReviewCard } from "../../src/domain/models";
+import { createDeck, createReviewCard } from "../../src/domain/models";
 
 function makeRepo() {
   let stored: unknown = undefined;
@@ -106,6 +106,53 @@ describe("LibraryService.query", () => {
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].sourceFile).toBe("folder/Cell.md");
   });
+
+  it("renders nested deck labels with full deck paths", async () => {
+    const card = createReviewCard("t-nested", "forward", "Prompt", "Answer");
+    const parentDeck = createDeck({ id: "science", name: "Science" });
+    const childDeck = createDeck({
+      id: "biology",
+      name: "Biology",
+      parentDeckId: parentDeck.id,
+    });
+    const template = {
+      id: "t-nested",
+      kind: "basic" as const,
+      deckId: childDeck.id,
+      tagIds: [],
+      sourceAnchor: {
+        filePath: "notes/Biology.md",
+        noteTitle: "Biology",
+        startOffset: 0,
+        endOffset: 4,
+        selectedText: "Cell",
+        leadingContext: "",
+        trailingContext: "",
+        excerpt: "Cell",
+        contentHash: "hash",
+        lastResolvedAt: new Date().toISOString(),
+      },
+      frontMarkdown: "Prompt",
+      backMarkdown: "Answer",
+      clozeMarkdown: null,
+      hintByClozeIndex: {},
+      customTemplateId: null,
+      generatedCardIds: [card.id],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      archived: false,
+    };
+
+    await repo.save((data) => ({
+      ...data,
+      decks: [...data.decks, parentDeck, childDeck],
+      cards: [card],
+      templates: [template],
+    }));
+
+    const result = await service.query(emptyQuery);
+    expect(result.rows[0]?.deckName).toBe("Science :: Biology");
+  });
 });
 
 describe("LibraryService.bulkUpdate", () => {
@@ -170,6 +217,8 @@ describe("LibraryService.bulkUpdate", () => {
 
   it("moves card to new deck", async () => {
     const card = createReviewCard("t1", "forward", "Q", "A");
+    const oldDeck = createDeck({ id: "old-deck", name: "Old Deck" });
+    const newDeck = createDeck({ id: "new-deck", name: "New Deck" });
     const template = {
       id: "t1",
       kind: "basic" as const,
@@ -190,7 +239,12 @@ describe("LibraryService.bulkUpdate", () => {
       updatedAt: new Date().toISOString(),
       archived: false,
     };
-    await repo.save((d) => ({ ...d, cards: [card], templates: [template] }));
+    await repo.save((d) => ({
+      ...d,
+      decks: [...d.decks, oldDeck, newDeck],
+      cards: [card],
+      templates: [template],
+    }));
 
     await service.bulkUpdate({ action: "move", cardIds: [card.id], deckId: "new-deck" });
 

@@ -1,4 +1,5 @@
 import type { PluginDataRepository } from "../../data/plugin-data-repository";
+import { getDeckLabel } from "../../domain/deck-utils";
 import type { ReviewSessionService } from "../../services/review-session-service";
 import type { FSRSScheduler } from "../../scheduling/fsrs-scheduler";
 import { renderRatingButtonRow, type RatingValue } from "../components/rating-button-row";
@@ -117,7 +118,7 @@ export class ReviewView {
     const topBar = this.container.createDiv({ cls: "srf-review__top-bar" });
     topBar.createDiv({
       cls: "srf-review__deck-pill srf-tag-pill",
-      text: deck?.name ?? "Deck",
+      text: getDeckLabel(data.decks, deck?.id ?? template?.deckId) ?? "Deck",
     });
     topBar.createDiv({
       cls: "srf-review__top-meta",

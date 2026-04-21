@@ -3,6 +3,7 @@ import type {
   ReviewCardState,
   TagRecord,
 } from "../domain/models";
+import { getDeckPathMap, isActiveDeckId } from "../domain/deck-utils";
 import { nowIso, createTag } from "../domain/models";
 
 // ─── I/O types ────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ export class LibraryService {
   async query(input: LibraryQueryInput): Promise<LibraryQueryResult> {
     const data = await this.repository.load();
 
-    const deckMap = new Map(data.decks.map((d) => [d.id, d.name]));
+    const deckMap = getDeckPathMap(data.decks, { includeArchivedSuffix: true });
     const tagMap = new Map(data.tags.map((t) => [t.id, t.label]));
     const templateMap = new Map(data.templates.map((t) => [t.id, t]));
 
@@ -161,6 +162,10 @@ export class LibraryService {
       });
 
       if (input.action === "move") {
+        if (!isActiveDeckId(data.decks, input.deckId)) {
+          throw new Error("Choose an active deck before moving cards.");
+        }
+
         const templates = data.templates.map((t) => {
           const hasMatchingCard = t.generatedCardIds.some((id) => idSet.has(id));
           if (!hasMatchingCard) return t;

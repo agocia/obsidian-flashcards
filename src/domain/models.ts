@@ -1,6 +1,7 @@
 // ─── Core identifiers ────────────────────────────────────────────────────────
 
 export const SCHEMA_VERSION = 2 as const;
+export const DEFAULT_DECK_ID = "default" as const;
 
 let _idCounter = 0;
 export function createId(prefix = "id"): string {
@@ -32,7 +33,7 @@ export interface PluginSettings {
 export function createDefaultSettings(): PluginSettings {
   return {
     themeMode: "system",
-    defaultDeckId: "default",
+    defaultDeckId: DEFAULT_DECK_ID,
     defaultCardMode: "basic",
     newCardsPerDay: 20,
     maxReviewsPerDay: 200,
@@ -63,7 +64,7 @@ export interface DeckRecord {
 export function createDefaultDeck(): DeckRecord {
   const now = nowIso();
   return {
-    id: "default",
+    id: DEFAULT_DECK_ID,
     name: "Default",
     parentDeckId: null,
     newLimitPerDay: null,
