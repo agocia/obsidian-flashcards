@@ -161,7 +161,16 @@ This keeps spaced-repetition logic separate from rendering and persistence.
 - `settings/` contains the plugin settings UI
 - `router/` handles workspace leaf routing
 
-### 6. Plugin entrypoint
+### 6. Style layer
+
+`src/styles/`
+
+- shared tokens
+- reusable plugin-level styles
+
+The final distributable stylesheet is emitted as `styles.css`.
+
+### 7. Plugin entrypoint
 
 `src/main.ts`
 
@@ -185,6 +194,7 @@ obsidian-flashcards/
 │   ├── parsing/
 │   ├── scheduling/
 │   ├── services/
+│   ├── styles/
 │   ├── ui/
 │   │   ├── builder/
 │   │   ├── components/
