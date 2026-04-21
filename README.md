@@ -88,6 +88,7 @@ The dashboard is the plugin home screen. It shows:
 - new cards
 - retention
 - streak
+- deck-scoped review selection
 - next review block
 - problem-card signals
 
@@ -107,6 +108,8 @@ The library is the management surface for the whole collection. It supports:
 The builder opens in Obsidian's right sidebar so it behaves like a native side panel. It is designed for quick capture while keeping the source note visible and reachable.
 
 The builder supports both source-backed cards and manual cards. Manual cards use an internal blank source anchor, so they are not forced to point to an Obsidian note. Use the deck selector's **New Deck** action when the target deck does not exist yet.
+
+Saving a card keeps the builder open and clears the content fields so the next card can be captured without reopening the panel.
 
 ### Review View
 

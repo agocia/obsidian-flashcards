@@ -93,6 +93,12 @@ function makeSelectionContext(): SelectionContext {
   };
 }
 
+async function flushDom(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.resolve();
+}
+
 describe("BuilderDrawer", () => {
   beforeEach(() => {
     installObsidianDomHelpers();
@@ -151,5 +157,58 @@ describe("BuilderDrawer", () => {
     expect(container.textContent).toContain("Source: Biology");
     expect(container.textContent).toContain("Source context · Biology");
     expect(updatedFrontArea.value).toBe("Manual prompt");
+  });
+
+  it("keeps the builder open after saving and clears content for the next card", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      previewTemplate: vi.fn((input) => [
+        {
+          variantKey: "forward",
+          promptMarkdown: input.frontMarkdown ?? "",
+          answerMarkdown: input.backMarkdown ?? "",
+        },
+      ]),
+      createFromSelection: vi.fn().mockResolvedValue({ cards: [] }),
+    };
+    const repository = {
+      snapshot: () => ({
+        settings: {
+          defaultDeckId: "default",
+          defaultCardMode: "basic",
+          previewDebounceMs: 0,
+        },
+        decks: [{ id: "default", name: "Default", archived: false }],
+      }),
+    };
+
+    const drawer = new BuilderDrawer(service as any, repository as any);
+    drawer.mount(container);
+    drawer.open(undefined, "basic");
+
+    const [frontArea, backArea] = Array.from(container.querySelectorAll("textarea")) as HTMLTextAreaElement[];
+    frontArea.value = "Question";
+    frontArea.dispatchEvent(new Event("input", { bubbles: true }));
+    backArea.value = "Answer";
+    backArea.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const buttons = Array.from(container.querySelectorAll("button"));
+    expect(buttons.some((button) => button.textContent === "Save & Add Another")).toBe(false);
+    const saveButton = buttons.find((button) => button.textContent === "Save") as HTMLButtonElement | undefined;
+    saveButton?.click();
+    await flushDom();
+
+    expect(service.createFromSelection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frontMarkdown: "Question",
+        backMarkdown: "Answer",
+      })
+    );
+    expect(container.textContent).toContain("Capture the idea while it is still fresh.");
+    const [nextFrontArea, nextBackArea] = Array.from(container.querySelectorAll("textarea")) as HTMLTextAreaElement[];
+    expect(nextFrontArea.value).toBe("");
+    expect(nextBackArea.value).toBe("");
   });
 });

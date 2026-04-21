@@ -11,14 +11,15 @@ export const DASHBOARD_VIEW_TYPE = "srf-dashboard";
 export class DashboardView {
   private container: HTMLElement;
   private service: DashboardService;
-  private onStartReview?: () => void;
+  private onStartReview?: (deckIds?: string[]) => void;
   private onCreateCard?: () => void;
   private onOpenLibrary?: () => void;
+  private selectedDeckId = "";
 
   constructor(
     container: HTMLElement,
     service: DashboardService,
-    onStartReview?: () => void,
+    onStartReview?: (deckIds?: string[]) => void,
     onCreateCard?: () => void,
     onOpenLibrary?: () => void
   ) {
@@ -45,24 +46,34 @@ export class DashboardView {
       return;
     }
 
+    if (this.selectedDeckId && !stats.decks.some((deck) => deck.id === this.selectedDeckId)) {
+      this.selectedDeckId = "";
+    }
+    const selectedDeck = stats.decks.find((deck) => deck.id === this.selectedDeckId) ?? null;
+    const scopedDueToday = selectedDeck ? selectedDeck.dueToday : stats.dueToday;
+    const scopedNewCards = selectedDeck ? selectedDeck.newCards : stats.newCards;
+    const reviewScopeLabel = selectedDeck?.name ?? "All decks";
+
     const hero = this.container.createDiv({ cls: "srf-panel srf-dashboard__hero" });
     const heroCopy = hero.createDiv({ cls: "srf-dashboard__hero-copy" });
     heroCopy.createEl("p", { cls: "srf-eyebrow", text: "Flashcards" });
     heroCopy.createEl("h1", {
       cls: "srf-dashboard__title",
-      text: stats.dueToday > 0 ? "A focused review session is ready." : "Your memory system is quiet and ready.",
+      text: scopedDueToday > 0 ? "A focused review session is ready." : "Your memory system is quiet and ready.",
     });
     heroCopy.createEl("p", {
       cls: "srf-dashboard__subtitle",
       text: "Capture ideas, review what matters, and keep the queue clean without leaving Obsidian.",
     });
 
+    this.renderDeckPicker(heroCopy, stats.decks);
+
     const actions = heroCopy.createDiv({ cls: "srf-dashboard__actions" });
     const startBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--primary",
-      text: stats.dueToday > 0 ? "Start Review" : "Open Review",
+      text: scopedDueToday > 0 ? "Start Review" : "Open Review",
     });
-    startBtn.addEventListener("click", () => this.onStartReview?.());
+    startBtn.addEventListener("click", () => this.startReview());
 
     const libraryBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--secondary",
@@ -79,15 +90,17 @@ export class DashboardView {
     const heroAside = hero.createDiv({ cls: "srf-dashboard__hero-aside" });
     heroAside.createDiv({
       cls: "srf-dashboard__hero-stat-label",
-      text: "Due right now",
+      text: `${reviewScopeLabel} due right now`,
     });
     heroAside.createDiv({
       cls: "srf-dashboard__hero-stat-value",
-      text: String(stats.dueToday),
+      text: String(scopedDueToday),
     });
     heroAside.createDiv({
       cls: "srf-dashboard__hero-stat-detail",
-      text: stats.continueDeckName
+      text: selectedDeck
+        ? `${selectedDeck.newCards} new · ${selectedDeck.totalCards} total`
+        : stats.continueDeckName
         ? `Continue ${stats.continueDeckName}`
         : stats.newCards > 0
           ? `${stats.newCards} new cards available`
@@ -96,13 +109,13 @@ export class DashboardView {
 
     const tilesRow = this.container.createDiv({ cls: "srf-dashboard__tiles" });
     renderMetricTile(tilesRow, {
-      label: "Due Today",
-      value: stats.dueToday,
-      tone: stats.dueToday > 0 ? "warning" : "neutral",
+      label: selectedDeck ? `${selectedDeck.name} Due` : "Due Today",
+      value: scopedDueToday,
+      tone: scopedDueToday > 0 ? "warning" : "neutral",
     });
     renderMetricTile(tilesRow, {
-      label: "New Cards",
-      value: stats.newCards,
+      label: selectedDeck ? `${selectedDeck.name} New` : "New Cards",
+      value: scopedNewCards,
       tone: "neutral",
     });
     renderMetricTile(tilesRow, {
@@ -121,11 +134,11 @@ export class DashboardView {
 
     const focusCard = grid.createDiv({ cls: "srf-panel srf-dashboard__focus-card" });
     focusCard.createEl("h2", { cls: "srf-dashboard__section-heading", text: "Focus" });
-    if (stats.dueToday === 0 && stats.newCards === 0) {
+    if (scopedDueToday === 0 && scopedNewCards === 0) {
       renderStateBanner(focusCard, {
         kind: "empty",
         headline: "You're all caught up",
-        body: "Capture the next idea while the queue is calm.",
+        body: `${reviewScopeLabel} has no due or new cards right now.`,
         ctaLabel: "Create Card",
         onCta: () => this.onCreateCard?.(),
       });
@@ -133,16 +146,16 @@ export class DashboardView {
       focusCard.createEl("p", {
         cls: "srf-dashboard__focus-copy",
         text:
-          stats.dueToday > 0
-            ? `You have ${stats.dueToday} due card${stats.dueToday === 1 ? "" : "s"} waiting.`
-            : `No due cards yet, but ${stats.newCards} new card${stats.newCards === 1 ? "" : "s"} can be introduced.`,
+          scopedDueToday > 0
+            ? `${reviewScopeLabel} has ${scopedDueToday} due card${scopedDueToday === 1 ? "" : "s"} waiting.`
+            : `No due cards in ${reviewScopeLabel}, but ${scopedNewCards} new card${scopedNewCards === 1 ? "" : "s"} can be introduced.`,
       });
       const focusActions = focusCard.createDiv({ cls: "srf-dashboard__focus-actions" });
       const reviewBtn = focusActions.createEl("button", {
         cls: "srf-btn srf-btn--primary srf-dashboard__start-btn",
         text: "Start Review",
       });
-      reviewBtn.addEventListener("click", () => this.onStartReview?.());
+      reviewBtn.addEventListener("click", () => this.startReview());
       const libraryAction = focusActions.createEl("button", {
         cls: "srf-btn srf-btn--secondary",
         text: "Tidy Library",
@@ -183,6 +196,34 @@ export class DashboardView {
         ? "Repeated lapses suggest these cards need editing or splitting."
         : "No problem cards are standing out right now."
     );
+  }
+
+  private renderDeckPicker(
+    container: HTMLElement,
+    decks: Array<{ id: string; name: string; dueToday: number; newCards: number; totalCards: number }>
+  ): void {
+    const picker = container.createDiv({ cls: "srf-dashboard__deck-picker" });
+    const label = picker.createEl("label", { cls: "srf-form-label", text: "Review deck" });
+    const select = picker.createEl("select", { cls: "srf-select" }) as HTMLSelectElement;
+    const allOption = select.createEl("option", { value: "", text: "All Decks" });
+    allOption.selected = this.selectedDeckId === "";
+    decks.forEach((deck) => {
+      const dueLabel = deck.dueToday > 0 ? `${deck.dueToday} due` : `${deck.newCards} new`;
+      const option = select.createEl("option", {
+        value: deck.id,
+        text: `${deck.name} · ${dueLabel}`,
+      });
+      option.selected = deck.id === this.selectedDeckId;
+    });
+    select.addEventListener("change", () => {
+      this.selectedDeckId = select.value;
+      void this.render();
+    });
+    label.addEventListener("click", () => select.focus());
+  }
+
+  private startReview(): void {
+    this.onStartReview?.(this.selectedDeckId ? [this.selectedDeckId] : []);
   }
 }
 

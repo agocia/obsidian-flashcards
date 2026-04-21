@@ -14,6 +14,15 @@ export interface DashboardStats {
   continueDeckName: string | null;
   recentlyAddedCardIds: string[];
   needsAttentionCardIds: string[];
+  decks: DashboardDeckSummary[];
+}
+
+export interface DashboardDeckSummary {
+  id: string;
+  name: string;
+  dueToday: number;
+  newCards: number;
+  totalCards: number;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -26,6 +35,7 @@ export class DashboardService {
     const continueDeckId = data.sessionDraft?.deckIds?.[0] ?? null;
     const continueDeckName =
       data.decks.find((deck) => deck.id === continueDeckId)?.name ?? continueDeckId;
+    const decks = summarizeDecks(data, now);
 
     return {
       dueToday: countDueToday(data.cards, now),
@@ -37,6 +47,7 @@ export class DashboardService {
       continueDeckName,
       recentlyAddedCardIds: findRecentlyAdded(data.cards, now),
       needsAttentionCardIds: findNeedsAttention(data.cards),
+      decks,
     };
   }
 }
@@ -105,4 +116,21 @@ function findNeedsAttention(cards: ReviewCardRecord[]): string[] {
     .sort((a, b) => b.lapses - a.lapses)
     .slice(0, 10)
     .map((c) => c.id);
+}
+
+function summarizeDecks(data: PluginData, now: Date): DashboardDeckSummary[] {
+  const templateDeckMap = new Map(data.templates.map((template) => [template.id, template.deckId]));
+
+  return data.decks
+    .filter((deck) => !deck.archived)
+    .map((deck) => {
+      const cards = data.cards.filter((card) => templateDeckMap.get(card.templateId) === deck.id);
+      return {
+        id: deck.id,
+        name: deck.name,
+        dueToday: countDueToday(cards, now),
+        newCards: countNewCards(cards),
+        totalCards: cards.length,
+      };
+    });
 }

@@ -250,17 +250,10 @@ export class BuilderDrawer {
 
     const saveBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--primary",
-      text: "Save Card",
+      text: "Save",
       attr: { type: "button" },
     });
-    saveBtn.addEventListener("click", () => this.save(false));
-
-    const saveNextBtn = actions.createEl("button", {
-      cls: "srf-btn srf-btn--secondary",
-      text: "Save & Add Another",
-      attr: { type: "button" },
-    });
-    saveNextBtn.addEventListener("click", () => this.save(true));
+    saveBtn.addEventListener("click", () => this.save());
 
     if (this.selectionContext?.filePath) {
       const sourceBtn = actions.createEl("button", {
@@ -350,7 +343,7 @@ export class BuilderDrawer {
     });
   }
 
-  private async save(addAnother: boolean): Promise<void> {
+  private async save(): Promise<void> {
     try {
       await this.service.createFromSelection({
         selectionContext: this.selectionContext,
@@ -364,14 +357,10 @@ export class BuilderDrawer {
       this.onCreated?.();
       new Notice("Card saved.");
 
-      if (addAnother) {
-        this.frontMarkdown = "";
-        this.backMarkdown = "";
-        this.clozeMarkdown = "";
-        this.render();
-      } else {
-        this.close();
-      }
+      this.frontMarkdown = "";
+      this.backMarkdown = "";
+      this.clozeMarkdown = "";
+      this.render();
     } catch (err) {
       console.error("[SRF] Save card failed:", err);
       const message = err instanceof Error ? err.message : "Could not save card.";

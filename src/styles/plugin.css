@@ -348,6 +348,13 @@
   line-height: 1.55;
 }
 
+.srf-dashboard__deck-picker {
+  display: grid;
+  gap: 6px;
+  max-width: 360px;
+  margin-top: 4px;
+}
+
 .srf-library__hero-actions {
   display: flex;
   gap: 8px;

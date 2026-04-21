@@ -72,7 +72,7 @@ class SRFDashboardLeaf extends ItemView {
   constructor(
     leaf: WorkspaceLeaf,
     private service: DashboardService,
-    private router: WorkspaceRouter,
+    private onStartReview: (deckIds?: string[]) => void,
     private onCreateCard: () => void,
     private onOpenLibrary: () => void
   ) {
@@ -88,7 +88,7 @@ class SRFDashboardLeaf extends ItemView {
       this.view = new DashboardView(
         this.contentEl,
         this.service,
-        () => this.router.openReview(),
+        (deckIds) => this.onStartReview(deckIds),
         () => this.onCreateCard(),
         () => this.onOpenLibrary()
       );
@@ -127,7 +127,8 @@ class SRFReviewLeaf extends ItemView {
     private scheduler: FSRSScheduler,
     private repository: PluginDataRepository,
     private app2: App,
-    private router: WorkspaceRouter
+    private router: WorkspaceRouter,
+    private consumeInitialDeckIds?: () => string[] | undefined
   ) {
     super(leaf);
   }
@@ -146,7 +147,7 @@ class SRFReviewLeaf extends ItemView {
         (src, el) => MarkdownRenderer.render(this.app2, src, el, "", this),
         () => this.router.openDashboard()
       );
-      await this.view.start();
+      await this.view.start(this.consumeInitialDeckIds?.());
     } catch (error) {
       console.error("[SRF] Review leaf failed to open:", error);
       this.renderLeafError(
@@ -159,6 +160,10 @@ class SRFReviewLeaf extends ItemView {
   async onClose() {
     this.view?.destroy();
     this.contentEl.empty();
+  }
+
+  async start(deckIds?: string[]): Promise<void> {
+    await this.view?.start(deckIds);
   }
 
   private renderLeafError(headline: string, body: string): void {
@@ -298,6 +303,7 @@ export default class FlashcardsPlugin extends Plugin {
   private settingsService!: SettingsService;
   private router!: WorkspaceRouter;
   private builderDrawer!: BuilderDrawer;
+  private pendingReviewDeckIds: string[] | undefined;
 
   async onload() {
     // ── Initialise services ───────────────────────────────────────────────
@@ -333,7 +339,7 @@ export default class FlashcardsPlugin extends Plugin {
       new SRFDashboardLeaf(
         leaf,
         this.dashboardService,
-        this.router,
+        (deckIds) => void this.openReview(deckIds),
         () => this.openBlankBuilder(),
         () => void this.router.openLibrary()
       )
@@ -346,7 +352,8 @@ export default class FlashcardsPlugin extends Plugin {
         this.scheduler,
         this.repository,
         this.app,
-        this.router
+        this.router,
+        () => this.consumePendingReviewDeckIds()
       )
     );
 
@@ -382,7 +389,7 @@ export default class FlashcardsPlugin extends Plugin {
     this.addCommand({
       id: "start-review",
       name: "Start Review Session",
-      callback: () => this.router.openReview(),
+      callback: () => void this.openReview(),
     });
 
     this.addCommand({
@@ -567,6 +574,29 @@ export default class FlashcardsPlugin extends Plugin {
     modeOverride?: GenerateTemplateInput["mode"]
   ): void {
     void this.openBuilderPane(undefined, modeOverride);
+  }
+
+  private async openReview(deckIds?: string[]): Promise<void> {
+    const existingLeaves = this.app.workspace.getLeavesOfType(REVIEW_VIEW_TYPE);
+    const normalizedDeckIds = deckIds && deckIds.length > 0 ? deckIds : undefined;
+
+    if (existingLeaves.length === 0) {
+      this.pendingReviewDeckIds = normalizedDeckIds;
+      await this.router.openReview();
+      return;
+    }
+
+    await this.router.openReview();
+    const reviewLeaf = this.app.workspace.getLeavesOfType(REVIEW_VIEW_TYPE)[0]?.view as
+      | SRFReviewLeaf
+      | undefined;
+    await reviewLeaf?.start(normalizedDeckIds);
+  }
+
+  private consumePendingReviewDeckIds(): string[] | undefined {
+    const deckIds = this.pendingReviewDeckIds;
+    this.pendingReviewDeckIds = undefined;
+    return deckIds;
   }
 
   private async refreshOpenViews(): Promise<void> {
