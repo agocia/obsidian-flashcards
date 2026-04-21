@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SelectionContext } from "../../../src/data/source-anchor-resolver";
+import { createReviewCard, type CardTemplateRecord } from "../../../src/domain/models";
 import { BuilderDrawer } from "../../../src/ui/builder/builder-drawer";
 
 vi.mock("obsidian", () => ({
@@ -210,5 +211,96 @@ describe("BuilderDrawer", () => {
     const [nextFrontArea, nextBackArea] = Array.from(container.querySelectorAll("textarea")) as HTMLTextAreaElement[];
     expect(nextFrontArea.value).toBe("");
     expect(nextBackArea.value).toBe("");
+  });
+
+  it("opens an existing card in edit mode and saves changes through the drawer", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const card = createReviewCard("tpl-1", "forward", "Old prompt", "Old answer");
+    card.id = "card-1";
+    const template: CardTemplateRecord = {
+      id: "tpl-1",
+      kind: "basic",
+      deckId: "default",
+      tagIds: [],
+      sourceAnchor: {
+        filePath: "notes/Biology.md",
+        noteTitle: "Biology",
+        startOffset: 0,
+        endOffset: 0,
+        selectedText: "Cell",
+        leadingContext: "",
+        trailingContext: "",
+        excerpt: "Cell",
+        contentHash: "",
+        lastResolvedAt: "2026-04-21T00:00:00.000Z",
+      },
+      frontMarkdown: "Old prompt",
+      backMarkdown: "Old answer",
+      clozeMarkdown: null,
+      hintByClozeIndex: {},
+      customTemplateId: null,
+      generatedCardIds: ["card-1"],
+      createdAt: "2026-04-21T00:00:00.000Z",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+      archived: false,
+    };
+
+    const service = {
+      previewTemplate: vi.fn(() => []),
+      createFromSelection: vi.fn(),
+    };
+    const repository = {
+      snapshot: () => ({
+        settings: {
+          defaultDeckId: "default",
+          defaultCardMode: "basic",
+          previewDebounceMs: 0,
+        },
+        decks: [{ id: "default", name: "Default", archived: false }],
+        cards: [card],
+        templates: [template],
+      }),
+    };
+    const onSaveCardEdit = vi.fn().mockResolvedValue({});
+
+    const drawer = new BuilderDrawer(
+      service as any,
+      repository as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onSaveCardEdit
+    );
+    drawer.mount(container);
+    drawer.openForEdit("card-1");
+
+    expect(container.textContent).toContain("Edit card");
+    expect(container.textContent).toContain("Source: Biology");
+
+    const [frontArea, backArea] = Array.from(container.querySelectorAll("textarea")) as HTMLTextAreaElement[];
+    expect(frontArea.value).toBe("Old prompt");
+    expect(backArea.value).toBe("Old answer");
+
+    frontArea.value = "New prompt";
+    frontArea.dispatchEvent(new Event("input", { bubbles: true }));
+    backArea.value = "New answer";
+    backArea.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save changes"
+    ) as HTMLButtonElement | undefined;
+    saveButton?.click();
+    await flushDom();
+
+    expect(onSaveCardEdit).toHaveBeenCalledWith({
+      cardId: "card-1",
+      promptMarkdown: "New prompt",
+      answerMarkdown: "New answer",
+      deckId: "default",
+    });
+    expect(service.createFromSelection).not.toHaveBeenCalled();
   });
 });

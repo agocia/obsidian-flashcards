@@ -59,6 +59,7 @@ export interface EditCardInput {
   cardId: string;
   promptMarkdown: string;
   answerMarkdown: string;
+  deckId?: string;
 }
 
 export interface EditCardResult {
@@ -160,6 +161,13 @@ export class LibraryService {
         throw new Error("CardNotFoundError: card does not exist");
       }
 
+      if (input.deckId) {
+        const targetDeck = data.decks.find((deck) => deck.id === input.deckId && !deck.archived);
+        if (!targetDeck) {
+          throw new Error("DeckNotFoundError: target deck does not exist");
+        }
+      }
+
       const cards = data.cards.map((card) => {
         if (card.id !== input.cardId) return card;
         updatedCard = {
@@ -180,6 +188,7 @@ export class LibraryService {
               originalCard,
               promptMarkdown,
               answerMarkdown,
+              input.deckId,
               now
             )
           : template
@@ -406,15 +415,19 @@ function syncTemplateForSingleCardEdit(
   card: ReviewCardRecord,
   promptMarkdown: string,
   answerMarkdown: string,
+  deckId: string | undefined,
   updatedAt: string
 ): CardTemplateRecord {
   const ownsOnlyThisCard =
     template.generatedCardIds.length === 1 && template.generatedCardIds[0] === card.id;
-  if (!ownsOnlyThisCard) return template;
-  if (template.kind !== "basic" && template.kind !== "custom") return template;
+  const withDeck = deckId && deckId !== template.deckId
+    ? { ...template, deckId, updatedAt }
+    : template;
+  if (!ownsOnlyThisCard) return withDeck;
+  if (template.kind !== "basic" && template.kind !== "custom") return withDeck;
 
   return {
-    ...template,
+    ...withDeck,
     frontMarkdown: promptMarkdown,
     backMarkdown: answerMarkdown,
     updatedAt,

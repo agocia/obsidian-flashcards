@@ -100,7 +100,7 @@ The library is the management surface for the whole collection. It supports:
 - filters for deck, tag, state, and source file
 - deck-directory navigation with paged rendering so large libraries do not mount every card at once
 - deck creation and deck renaming from the library
-- inline card editing for prompt and answer text
+- right-side card editing through the same drawer used for card creation
 - bulk actions through an inline action tray
 - direct return to the dashboard
 - direct jump back to the source note

@@ -3,8 +3,15 @@ import type { PluginDataRepository } from "../../data/plugin-data-repository";
 import type { SelectionContext } from "../../data/source-anchor-resolver";
 import type { CardBuilderService, PreviewCardPayload } from "../../services/card-builder-service";
 import type { GenerateTemplateInput } from "../../parsing/template-generator";
+import type { SourceAnchor } from "../../domain/models";
 
 type DeckOption = { id: string; name: string };
+type SaveCardEditInput = {
+  cardId: string;
+  promptMarkdown: string;
+  answerMarkdown: string;
+  deckId: string;
+};
 
 /**
  * Builder panel — card creation surface mounted inside an Obsidian side pane.
@@ -22,9 +29,13 @@ export class BuilderDrawer {
     onAttach: (selectionContext: SelectionContext) => void
   ) => void;
   private onCreateDeck?: (name: string) => Promise<DeckOption>;
+  private onSaveCardEdit?: (input: SaveCardEditInput) => Promise<unknown>;
   private onRequestClose?: () => void;
   private previewTimer: number | null = null;
 
+  private editingCardId: string | null = null;
+  private editingVariantKey = "";
+  private editingSourceAnchor: SourceAnchor | null = null;
   private mode: GenerateTemplateInput["mode"] = "basic";
   private frontMarkdown = "";
   private backMarkdown = "";
@@ -43,7 +54,8 @@ export class BuilderDrawer {
       modeOverride: GenerateTemplateInput["mode"],
       onAttach: (selectionContext: SelectionContext) => void
     ) => void,
-    onCreateDeck?: (name: string) => Promise<DeckOption>
+    onCreateDeck?: (name: string) => Promise<DeckOption>,
+    onSaveCardEdit?: (input: SaveCardEditInput) => Promise<unknown>
   ) {
     this.service = service;
     this.repository = repository;
@@ -51,6 +63,7 @@ export class BuilderDrawer {
     this.onOpenSourceNote = onOpenSourceNote;
     this.onPickSourceNote = onPickSourceNote;
     this.onCreateDeck = onCreateDeck;
+    this.onSaveCardEdit = onSaveCardEdit;
   }
 
   mount(container: HTMLElement, onRequestClose?: () => void): void {
@@ -71,6 +84,9 @@ export class BuilderDrawer {
     selectionContext?: SelectionContext,
     modeOverride?: GenerateTemplateInput["mode"]
   ): void {
+    this.editingCardId = null;
+    this.editingVariantKey = "";
+    this.editingSourceAnchor = null;
     this.selectionContext = selectionContext;
 
     const settings = this.repository.snapshot().settings;
@@ -97,21 +113,53 @@ export class BuilderDrawer {
     this.render();
   }
 
+  openForEdit(cardId: string): void {
+    const data = this.repository.snapshot();
+    const card = data.cards.find((candidate) => candidate.id === cardId);
+    if (!card) {
+      new Notice("Card not found.");
+      return;
+    }
+
+    const template = data.templates.find((candidate) => candidate.id === card.templateId) ?? null;
+    const settings = data.settings;
+
+    this.editingCardId = card.id;
+    this.editingVariantKey = card.variantKey;
+    this.editingSourceAnchor = template?.sourceAnchor ?? null;
+    this.selectionContext = undefined;
+    this.mode = "basic";
+    this.deckId = template?.deckId ?? settings.defaultDeckId;
+    this.frontMarkdown = card.promptMarkdown;
+    this.backMarkdown = card.answerMarkdown;
+    this.clozeMarkdown = "";
+    this.newDeckName = "";
+    this.isDeckCreatorOpen = false;
+
+    this.render();
+  }
+
   private render(): void {
     this.clearRendered();
     if (!this.container) return;
 
     const drawer = this.container.createDiv({ cls: "srf-builder-drawer" });
     this.el = drawer;
+    const isEditing = this.editingCardId !== null;
+    const sourceTitle = this.currentSourceTitle();
+    const sourceFilePath = this.currentSourceFilePath();
 
     const header = drawer.createDiv({ cls: "srf-builder-drawer__header" });
     const titleWrap = header.createDiv({ cls: "srf-builder-drawer__title-wrap" });
-    titleWrap.createEl("p", { cls: "srf-eyebrow", text: "Card builder" });
-    titleWrap.createEl("h2", { cls: "srf-builder-drawer__title", text: "Capture the idea while it is still fresh." });
+    titleWrap.createEl("p", { cls: "srf-eyebrow", text: isEditing ? "Edit card" : "Card builder" });
+    titleWrap.createEl("h2", {
+      cls: "srf-builder-drawer__title",
+      text: isEditing ? "Tune this card in the same focused panel." : "Capture the idea while it is still fresh.",
+    });
     titleWrap.createEl("p", {
       cls: "srf-builder-drawer__subtitle",
-      text: this.selectionContext
-        ? `Source: ${this.selectionContext.noteTitle}`
+      text: sourceTitle
+        ? `Source: ${sourceTitle}`
         : "Manual card. Source is optional; just type and save.",
     });
 
@@ -122,17 +170,24 @@ export class BuilderDrawer {
     closeBtn.setAttribute("aria-label", "Close builder");
     closeBtn.addEventListener("click", () => this.close());
 
-    const tabs = drawer.createDiv({ cls: "srf-builder-drawer__mode-tabs" });
-    CARD_MODES.forEach(({ mode, label, badge }) => {
-      const tab = tabs.createEl("button", {
-        cls: `srf-mode-tab${this.mode === mode ? " srf-mode-tab--active" : ""}`,
+    if (!isEditing) {
+      const tabs = drawer.createDiv({ cls: "srf-builder-drawer__mode-tabs" });
+      CARD_MODES.forEach(({ mode, label, badge }) => {
+        const tab = tabs.createEl("button", {
+          cls: `srf-mode-tab${this.mode === mode ? " srf-mode-tab--active" : ""}`,
+        });
+        tab.createSpan({ cls: "srf-mode-tab__label", text: label });
+        tab.createSpan({ cls: "srf-mode-tab__badge", text: badge });
+        tab.addEventListener("click", () => this.switchMode(mode));
       });
-      tab.createSpan({ cls: "srf-mode-tab__label", text: label });
-      tab.createSpan({ cls: "srf-mode-tab__badge", text: badge });
-      tab.addEventListener("click", () => this.switchMode(mode));
-    });
+    }
 
-    const modeInfo = getModeInfo(this.mode);
+    const modeInfo = isEditing
+      ? {
+          title: "Single card edit",
+          description: `Save changes back to this ${this.editingVariantKey || "card"} without creating another card.`,
+        }
+      : getModeInfo(this.mode);
     const modeHelp = drawer.createDiv({ cls: "srf-panel srf-builder-drawer__mode-help" });
     modeHelp.createEl("strong", { text: modeInfo.title });
     modeHelp.createEl("span", { text: modeInfo.description });
@@ -142,29 +197,32 @@ export class BuilderDrawer {
     const sourceCard = body.createEl("details", { cls: "srf-panel srf-builder-drawer__source-card" });
     sourceCard.createEl("summary", {
       cls: "srf-builder-drawer__source-summary",
-      text: this.selectionContext
-        ? `Source context · ${this.selectionContext.noteTitle}`
+      text: sourceTitle
+        ? `Source context · ${sourceTitle}`
         : "Source context",
     });
-    if (this.selectionContext) {
+    if (sourceTitle || sourceFilePath) {
       sourceCard.createDiv({
         cls: "srf-builder-drawer__source-note",
-        text: this.selectionContext.noteTitle,
+        text: sourceTitle || "Source note",
       });
       sourceCard.createDiv({
         cls: "srf-builder-drawer__source-path",
-        text: this.selectionContext.filePath,
+        text: sourceFilePath,
       });
-      sourceCard.createEl("blockquote", {
-        cls: "srf-builder-drawer__excerpt",
-        text: this.selectedText(),
-      });
+      const excerpt = this.currentSourceExcerpt();
+      if (excerpt) {
+        sourceCard.createEl("blockquote", {
+          cls: "srf-builder-drawer__excerpt",
+          text: excerpt,
+        });
+      }
     } else {
       sourceCard.createDiv({
         cls: "srf-text-tertiary",
         text: "No source selected. This card will live in the deck without linking back to a note.",
       });
-      if (this.onPickSourceNote) {
+      if (this.onPickSourceNote && !isEditing) {
         const attachBtn = sourceCard.createEl("button", {
           cls: "srf-btn srf-btn--ghost srf-builder-drawer__source-action",
           text: "Attach Source Note",
@@ -208,7 +266,7 @@ export class BuilderDrawer {
       this.renderDeckCreator(deckField);
     }
 
-    if (this.mode === "cloze") {
+    if (!isEditing && this.mode === "cloze") {
       const clozeLabel = form.createEl("label", { cls: "srf-form-label" });
       clozeLabel.textContent = "Cloze text";
       const clozeArea = form.createEl("textarea", {
@@ -250,20 +308,20 @@ export class BuilderDrawer {
 
     const saveBtn = actions.createEl("button", {
       cls: "srf-btn srf-btn--primary",
-      text: "Save",
+      text: isEditing ? "Save changes" : "Save",
       attr: { type: "button" },
     });
     saveBtn.addEventListener("click", () => this.save());
 
-    if (this.selectionContext?.filePath) {
+    if (sourceFilePath) {
       const sourceBtn = actions.createEl("button", {
         cls: "srf-btn srf-btn--ghost",
         text: "Open Source Note",
         attr: { type: "button" },
       });
       sourceBtn.addEventListener("click", () => {
-        if (this.selectionContext?.filePath) {
-          const filePath = this.selectionContext.filePath;
+        if (sourceFilePath) {
+          const filePath = sourceFilePath;
           this.close();
           this.onOpenSourceNote?.(filePath);
         }
@@ -301,6 +359,19 @@ export class BuilderDrawer {
     );
   }
 
+  private currentSourceTitle(): string {
+    return this.selectionContext?.noteTitle ?? this.editingSourceAnchor?.noteTitle ?? "";
+  }
+
+  private currentSourceFilePath(): string {
+    return this.selectionContext?.filePath ?? this.editingSourceAnchor?.filePath ?? "";
+  }
+
+  private currentSourceExcerpt(): string {
+    if (this.selectionContext) return this.selectedText();
+    return this.editingSourceAnchor?.excerpt || this.editingSourceAnchor?.selectedText || "";
+  }
+
   private schedulePreview(col: HTMLElement): void {
     this.clearPreviewTimer();
     const delay = this.repository.snapshot().settings.previewDebounceMs;
@@ -318,14 +389,22 @@ export class BuilderDrawer {
 
     let payloads: PreviewCardPayload[] = [];
     try {
-      payloads = this.service.previewTemplate({
-        mode: this.mode,
-        deckId: this.deckId,
-        tagIds: [],
-        frontMarkdown: this.frontMarkdown,
-        backMarkdown: this.backMarkdown,
-        clozeMarkdown: this.mode === "cloze" ? this.clozeMarkdown : undefined,
-      });
+      payloads = this.editingCardId
+        ? [
+            {
+              variantKey: this.editingVariantKey || "forward",
+              promptMarkdown: this.frontMarkdown,
+              answerMarkdown: this.backMarkdown,
+            },
+          ]
+        : this.service.previewTemplate({
+            mode: this.mode,
+            deckId: this.deckId,
+            tagIds: [],
+            frontMarkdown: this.frontMarkdown,
+            backMarkdown: this.backMarkdown,
+            clozeMarkdown: this.mode === "cloze" ? this.clozeMarkdown : undefined,
+          });
     } catch {
       preview.createEl("p", { cls: "srf-text-tertiary", text: "Nothing to preview yet." });
       return;
@@ -345,6 +424,24 @@ export class BuilderDrawer {
 
   private async save(): Promise<void> {
     try {
+      if (this.editingCardId) {
+        if (!this.onSaveCardEdit) {
+          new Notice("Card editor is not available.");
+          return;
+        }
+
+        await this.onSaveCardEdit({
+          cardId: this.editingCardId,
+          promptMarkdown: this.frontMarkdown,
+          answerMarkdown: this.backMarkdown,
+          deckId: this.deckId,
+        });
+        this.onCreated?.();
+        new Notice("Card updated.");
+        this.render();
+        return;
+      }
+
       await this.service.createFromSelection({
         selectionContext: this.selectionContext,
         mode: this.mode,

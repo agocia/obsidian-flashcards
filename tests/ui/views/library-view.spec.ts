@@ -199,16 +199,16 @@ describe("LibraryView", () => {
     ).toBe(true);
   });
 
-  it("edits a card inline from the library", async () => {
+  it("keeps card content out of the library list and opens the side editor", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
 
-    let row = makeRow({
+    const row = makeRow({
       cardId: "card-edit",
-      promptMarkdown: "Old **Prompt**",
-      answerMarkdown: "Old answer",
-      promptText: "Old Prompt",
-      answerText: "Old answer",
+      promptMarkdown: "Private **Prompt**",
+      answerMarkdown: "Private answer",
+      promptText: "Private Prompt",
+      answerText: "Private answer",
     });
     const service = {
       query: vi.fn().mockImplementation(async () => ({
@@ -216,56 +216,34 @@ describe("LibraryView", () => {
         rows: [row],
       })),
       bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
-      editCard: vi.fn().mockImplementation(
-        async (input: { cardId: string; promptMarkdown: string; answerMarkdown: string }) => {
-          row = {
-            ...row,
-            promptMarkdown: input.promptMarkdown,
-            answerMarkdown: input.answerMarkdown,
-            promptText: "New Prompt",
-            answerText: "New answer",
-          };
-          return { updatedCard: { id: input.cardId } };
-        }
-      ),
     };
+    const onEditCard = vi.fn();
 
     const view = new LibraryView(
       container,
       service as any,
       [{ id: "default", name: "Default" }],
       [],
-      []
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onEditCard
     );
 
     await view.render();
+
+    expect(container.textContent).not.toContain("Private Prompt");
+    expect(container.textContent).not.toContain("Private answer");
+    expect(container.textContent).toContain("Basic · Forward");
 
     const editButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Edit"
     ) as HTMLButtonElement | undefined;
     editButton?.click();
-    await flushDom();
 
-    const textareas = Array.from(
-      container.querySelectorAll(".srf-library-card__edit-textarea")
-    ) as HTMLTextAreaElement[];
-    textareas[0].value = "New **Prompt**";
-    textareas[0].dispatchEvent(new Event("input", { bubbles: true }));
-    textareas[1].value = "New answer";
-    textareas[1].dispatchEvent(new Event("input", { bubbles: true }));
-
-    const saveButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Save changes"
-    ) as HTMLButtonElement | undefined;
-    saveButton?.click();
-    await flushDom();
-
-    expect(service.editCard).toHaveBeenCalledWith({
-      cardId: "card-edit",
-      promptMarkdown: "New **Prompt**",
-      answerMarkdown: "New answer",
-    });
-    expect(container.textContent).toContain("New Prompt");
+    expect(onEditCard).toHaveBeenCalledWith("card-edit");
   });
 
   it("reloads library filter metadata on every render", async () => {
@@ -475,6 +453,8 @@ describe("LibraryView", () => {
           makeRow({
             cardId: input.offset === 100 ? "card-101" : "card-1",
             promptText: input.offset === 100 ? "Last card" : "First card",
+            sourceFile: input.offset === 100 ? "notes/Last.md" : "notes/First.md",
+            sourceNoteTitle: input.offset === 100 ? "Last" : "First",
           }),
         ],
       })),
@@ -510,7 +490,8 @@ describe("LibraryView", () => {
         offset: 100,
       })
     );
-    expect(container.textContent).toContain("Last card");
+    expect(container.textContent).toContain("Last.md");
+    expect(container.textContent).not.toContain("Last card");
   });
 
   it("moves selected cards from the inline bulk tray", async () => {

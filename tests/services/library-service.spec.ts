@@ -213,6 +213,27 @@ describe("LibraryService.editCard", () => {
     });
   });
 
+  it("can move the card deck while saving from the editor", async () => {
+    const card = createReviewCard("t1", "forward", "Old prompt", "Old answer");
+    const template = makeTemplate(card);
+    const targetDeck = createDeck({ id: "deck-2", name: "Exam Deck" });
+    await repo.save((d) => ({
+      ...d,
+      decks: [...d.decks, targetDeck],
+      cards: [card],
+      templates: [template],
+    }));
+
+    await service.editCard({
+      cardId: card.id,
+      promptMarkdown: "Old prompt",
+      answerMarkdown: "Old answer",
+      deckId: "deck-2",
+    });
+
+    expect(repo.snapshot().templates[0].deckId).toBe("deck-2");
+  });
+
   it("rejects blank prompts", async () => {
     const card = createReviewCard("t1", "forward", "Old prompt", "Old answer");
     await repo.save((d) => ({ ...d, cards: [card] }));

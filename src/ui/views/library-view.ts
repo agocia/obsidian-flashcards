@@ -25,6 +25,7 @@ export class LibraryView {
   private onCreateCard?: () => void;
   private onOpenDashboard?: () => void;
   private onOpenSourceNote?: (filePath: string) => void;
+  private onEditCard?: (cardId: string) => void;
   private loadOptions?: () =>
     | Promise<LibraryViewOptionsPayload>
     | LibraryViewOptionsPayload;
@@ -56,10 +57,6 @@ export class LibraryView {
   private isRenameDeckEditorOpen = false;
   private isRenamingDeck = false;
   private isApplyingBulkAction = false;
-  private editingCardId: string | null = null;
-  private editPromptMarkdown = "";
-  private editAnswerMarkdown = "";
-  private isSavingCardEdit = false;
 
   constructor(
     container: HTMLElement,
@@ -70,7 +67,8 @@ export class LibraryView {
     onCreateCard?: () => void,
     onOpenSourceNote?: (filePath: string) => void,
     loadOptions?: () => Promise<LibraryViewOptionsPayload> | LibraryViewOptionsPayload,
-    onOpenDashboard?: () => void
+    onOpenDashboard?: () => void,
+    onEditCard?: (cardId: string) => void
   ) {
     this.container = container;
     this.service = service;
@@ -81,6 +79,7 @@ export class LibraryView {
     this.onOpenDashboard = onOpenDashboard;
     this.onOpenSourceNote = onOpenSourceNote;
     this.loadOptions = loadOptions;
+    this.onEditCard = onEditCard;
   }
 
   async render(): Promise<void> {
@@ -201,7 +200,7 @@ export class LibraryView {
       const copy = header.createDiv({ cls: "srf-library-card__copy" });
       copy.createDiv({
         cls: "srf-library-card__prompt",
-        text: row.promptText || "Untitled prompt",
+        text: formatCardIdentity(row),
       });
       copy.createDiv({
         cls: "srf-library-card__source-path",
@@ -211,12 +210,16 @@ export class LibraryView {
       const headerActions = header.createDiv({ cls: "srf-library-card__header-actions" });
       const editButton = headerActions.createEl("button", {
         cls: "srf-btn srf-btn--ghost srf-library-card__edit-button",
-        text: this.editingCardId === row.cardId ? "Editing" : "Edit",
+        text: "Edit",
         attr: { type: "button" },
       }) as HTMLButtonElement;
       editButton.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.openCardEditor(row);
+        if (this.onEditCard) {
+          this.onEditCard(row.cardId);
+        } else {
+          new Notice("Card editor is not available.");
+        }
       });
 
       const stateBadge = headerActions.createSpan({
@@ -224,15 +227,6 @@ export class LibraryView {
         text: row.state,
       });
       stateBadge.setAttribute("aria-label", `Card state: ${row.state}`);
-
-      if (this.editingCardId === row.cardId) {
-        this.renderCardEditor(body, row);
-      } else if (row.answerText) {
-        body.createDiv({
-          cls: "srf-library-card__answer-preview",
-          text: row.answerText,
-        });
-      }
 
       const tags = body.createDiv({ cls: "srf-library-card__tags" });
       if (row.tags.length > 0) {
@@ -496,111 +490,6 @@ export class LibraryView {
     const stat = container.createDiv({ cls: "srf-library__hero-stat" });
     stat.createDiv({ cls: "srf-library__hero-stat-value", text: value });
     stat.createDiv({ cls: "srf-library__hero-stat-label", text: label });
-  }
-
-  private openCardEditor(row: LibraryRow): void {
-    this.editingCardId = row.cardId;
-    this.editPromptMarkdown = row.promptMarkdown || row.promptText;
-    this.editAnswerMarkdown = row.answerMarkdown || row.answerText;
-    void this.render();
-  }
-
-  private renderCardEditor(container: HTMLElement, row: LibraryRow): void {
-    const form = container.createEl("form", { cls: "srf-library-card__edit-form" });
-    form.addEventListener("click", (event) => event.stopPropagation());
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void this.saveCardEdit(row.cardId);
-    });
-
-    const fields = form.createDiv({ cls: "srf-library-card__edit-grid" });
-    const promptField = fields.createEl("label", { cls: "srf-library-card__edit-field" });
-    promptField.createSpan({ cls: "srf-library-card__edit-label", text: "Prompt" });
-    const promptInput = promptField.createEl("textarea", {
-      cls: "srf-textarea srf-library-card__edit-textarea",
-      attr: { rows: "4" },
-    }) as HTMLTextAreaElement;
-    promptInput.value = this.editPromptMarkdown;
-
-    const answerField = fields.createEl("label", { cls: "srf-library-card__edit-field" });
-    answerField.createSpan({ cls: "srf-library-card__edit-label", text: "Answer" });
-    const answerInput = answerField.createEl("textarea", {
-      cls: "srf-textarea srf-library-card__edit-textarea",
-      attr: { rows: "4" },
-    }) as HTMLTextAreaElement;
-    answerInput.value = this.editAnswerMarkdown;
-
-    const actions = form.createDiv({ cls: "srf-library-card__edit-actions" });
-    const save = actions.createEl("button", {
-      cls: "srf-btn srf-btn--primary",
-      text: this.isSavingCardEdit ? "Saving..." : "Save changes",
-      attr: { type: "submit" },
-    }) as HTMLButtonElement;
-
-    const cancel = actions.createEl("button", {
-      cls: "srf-btn srf-btn--ghost",
-      text: "Cancel",
-      attr: { type: "button" },
-    }) as HTMLButtonElement;
-    cancel.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.closeCardEditor();
-    });
-
-    const syncSaveState = () => {
-      const prompt = promptInput.value.trim();
-      const unchanged =
-        promptInput.value === (row.promptMarkdown || row.promptText) &&
-        answerInput.value === (row.answerMarkdown || row.answerText);
-      save.disabled = this.isSavingCardEdit || !prompt || unchanged;
-    };
-
-    promptInput.addEventListener("input", () => {
-      this.editPromptMarkdown = promptInput.value;
-      syncSaveState();
-    });
-    answerInput.addEventListener("input", () => {
-      this.editAnswerMarkdown = answerInput.value;
-      syncSaveState();
-    });
-    syncSaveState();
-  }
-
-  private closeCardEditor(): void {
-    this.editingCardId = null;
-    this.editPromptMarkdown = "";
-    this.editAnswerMarkdown = "";
-    this.isSavingCardEdit = false;
-    void this.render();
-  }
-
-  private async saveCardEdit(cardId: string): Promise<void> {
-    if (this.isSavingCardEdit) return;
-
-    const promptMarkdown = this.editPromptMarkdown.trim();
-    const answerMarkdown = this.editAnswerMarkdown.trim();
-    if (!promptMarkdown) {
-      new Notice("Card prompt is required.");
-      return;
-    }
-
-    this.isSavingCardEdit = true;
-    try {
-      await this.service.editCard({ cardId, promptMarkdown, answerMarkdown });
-      this.editingCardId = null;
-      this.editPromptMarkdown = "";
-      this.editAnswerMarkdown = "";
-      new Notice("Card updated.");
-      await this.render();
-    } catch (error) {
-      console.error("[SRF] Card edit failed:", error);
-      new Notice(error instanceof Error ? error.message : "Could not update card.");
-      this.isSavingCardEdit = false;
-      void this.render();
-      return;
-    }
-
-    this.isSavingCardEdit = false;
   }
 
   private renderBulkBar(): void {
@@ -1007,7 +896,6 @@ export class LibraryView {
     this.pageIndex = 0;
     this.selectedRowIds.clear();
     this.activeBulkEditor = null;
-    this.editingCardId = null;
     await this.render();
   }
 
@@ -1015,7 +903,6 @@ export class LibraryView {
     this.pageIndex = Math.max(0, pageIndex);
     this.selectedRowIds.clear();
     this.activeBulkEditor = null;
-    this.editingCardId = null;
     await this.render();
   }
 }
@@ -1029,6 +916,22 @@ function formatDue(iso: string): string {
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
   return `${diffDays}d`;
+}
+
+function formatCardIdentity(row: LibraryRow): string {
+  const kind = row.templateKind ? capitalize(row.templateKind) : "Card";
+  const variant = row.variantKey ? ` · ${formatVariant(row.variantKey)}` : "";
+  return `${kind}${variant}`;
+}
+
+function formatVariant(variantKey: string): string {
+  if (variantKey.startsWith("cloze:")) return `Cloze ${variantKey.split(":")[1] ?? ""}`.trim();
+  return capitalize(variantKey.replace(/[-_]/g, " "));
+}
+
+function capitalize(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function fileLabel(path: string): string {

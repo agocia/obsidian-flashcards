@@ -183,7 +183,8 @@ class SRFLibraryLeaf extends ItemView {
     private repository: PluginDataRepository,
     private onCreateCard: () => void,
     private onOpenDashboard: () => void,
-    private onOpenSourceNote: (filePath: string) => void
+    private onOpenSourceNote: (filePath: string) => void,
+    private onEditCard: (cardId: string) => void
   ) {
     super(leaf);
   }
@@ -222,7 +223,8 @@ class SRFLibraryLeaf extends ItemView {
             ],
           };
         },
-        () => this.onOpenDashboard()
+        () => this.onOpenDashboard(),
+        (cardId) => this.onEditCard(cardId)
       );
       await this.view.render();
     } catch (error) {
@@ -272,6 +274,10 @@ class SRFBuilderLeaf extends ItemView {
     modeOverride?: GenerateTemplateInput["mode"]
   ): void {
     this.builderDrawer.open(selectionContext, modeOverride);
+  }
+
+  openCardEditor(cardId: string): void {
+    this.builderDrawer.openForEdit(cardId);
   }
 
   async onClose() {
@@ -333,7 +339,8 @@ export default class FlashcardsPlugin extends Plugin {
       (filePath) => void this.openSourceNote(filePath),
       (modeOverride, onAttach) =>
         this.pickSourceNoteForBuilder(modeOverride, onAttach),
-      (name) => this.libraryService.createDeck({ name })
+      (name) => this.libraryService.createDeck({ name }),
+      (input) => this.libraryService.editCard(input)
     );
 
     // ── Register views ────────────────────────────────────────────────────
@@ -366,7 +373,8 @@ export default class FlashcardsPlugin extends Plugin {
         this.repository,
         () => this.openBlankBuilder(),
         () => void this.router.openDashboard(),
-        (filePath) => void this.openSourceNote(filePath)
+        (filePath) => void this.openSourceNote(filePath),
+        (cardId) => void this.openCardEditor(cardId)
       )
     );
 
@@ -577,6 +585,39 @@ export default class FlashcardsPlugin extends Plugin {
     modeOverride?: GenerateTemplateInput["mode"]
   ): void {
     void this.openBuilderPane(undefined, modeOverride);
+  }
+
+  private async openCardEditor(cardId: string): Promise<void> {
+    let leaf: WorkspaceLeaf | null = this.app.workspace.getLeavesOfType(BUILDER_VIEW_TYPE)[0] ?? null;
+
+    if (!leaf) {
+      const workspace = this.app.workspace as typeof this.app.workspace & {
+        ensureSideLeaf?: (
+          type: string,
+          side: "left" | "right",
+          options?: { active?: boolean; split?: boolean; reveal?: boolean; state?: unknown }
+        ) => Promise<WorkspaceLeaf>;
+      };
+
+      if (typeof workspace.ensureSideLeaf === "function") {
+        leaf = await workspace.ensureSideLeaf(BUILDER_VIEW_TYPE, "right", {
+          active: true,
+          reveal: true,
+        });
+      } else {
+        leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true);
+        await leaf.setViewState({ type: BUILDER_VIEW_TYPE, active: true });
+        await this.app.workspace.revealLeaf(leaf);
+      }
+    } else {
+      await this.app.workspace.revealLeaf(leaf);
+    }
+
+    if (leaf.view instanceof SRFBuilderLeaf) {
+      leaf.view.openCardEditor(cardId);
+    } else {
+      this.builderDrawer.openForEdit(cardId);
+    }
   }
 
   private async openReview(deckIds?: string[]): Promise<void> {
