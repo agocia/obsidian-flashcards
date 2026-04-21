@@ -199,7 +199,7 @@ describe("LibraryView", () => {
     ).toBe(true);
   });
 
-  it("keeps card content out of the library list and opens the side editor", async () => {
+  it("shows a compact front preview but keeps answers out of the library list", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
 
@@ -234,7 +234,7 @@ describe("LibraryView", () => {
 
     await view.render();
 
-    expect(container.textContent).not.toContain("Private Prompt");
+    expect(container.textContent).toContain("Front: Private Prompt");
     expect(container.textContent).not.toContain("Private answer");
     expect(container.textContent).toContain("Basic · Forward");
 
@@ -244,6 +244,34 @@ describe("LibraryView", () => {
     editButton?.click();
 
     expect(onEditCard).toHaveBeenCalledWith("card-edit");
+  });
+
+  it("truncates long front previews so cards stay compact", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const longPrompt = "Front ".repeat(80).trim();
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow({ promptText: longPrompt })],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const preview = container.querySelector(".srf-library-card__front-preview");
+    expect(preview?.textContent?.length).toBeLessThanOrEqual(169);
+    expect(preview?.textContent).toMatch(/\.\.\.$/);
   });
 
   it("reloads library filter metadata on every render", async () => {
@@ -491,7 +519,7 @@ describe("LibraryView", () => {
       })
     );
     expect(container.textContent).toContain("Last.md");
-    expect(container.textContent).not.toContain("Last card");
+    expect(container.textContent).toContain("Front: Last card");
   });
 
   it("moves selected cards from the inline bulk tray", async () => {

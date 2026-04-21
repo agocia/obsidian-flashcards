@@ -203,6 +203,10 @@ export class LibraryView {
         text: formatCardIdentity(row),
       });
       copy.createDiv({
+        cls: "srf-library-card__front-preview",
+        text: formatFrontPreview(row.promptText),
+      });
+      copy.createDiv({
         cls: "srf-library-card__source-path",
         text: row.sourceFile ? fileLabel(row.sourceFile) : "No source note",
       });
@@ -922,6 +926,17 @@ function formatCardIdentity(row: LibraryRow): string {
   const kind = row.templateKind ? capitalize(row.templateKind) : "Card";
   const variant = row.variantKey ? ` · ${formatVariant(row.variantKey)}` : "";
   return `${kind}${variant}`;
+}
+
+function formatFrontPreview(promptText: string): string {
+  const normalized = promptText.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Front: Untitled prompt";
+  const maxLength = 160;
+  const preview =
+    normalized.length > maxLength
+      ? `${normalized.slice(0, maxLength - 1).trimEnd()}...`
+      : normalized;
+  return `Front: ${preview}`;
 }
 
 function formatVariant(variantKey: string): string {
