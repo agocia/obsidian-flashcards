@@ -44,6 +44,24 @@ describe("LibraryService.query", () => {
     expect(result.rows).toHaveLength(2);
   });
 
+  it("paginates rows without changing the filtered total", async () => {
+    const cards = Array.from({ length: 3 }, (_, index) =>
+      createReviewCard(`t${index}`, "forward", `Prompt ${index}`, `Answer ${index}`)
+    );
+    await repo.save((d) => ({ ...d, cards }));
+
+    const result = await service.query({
+      ...emptyQuery,
+      limit: 1,
+      offset: 1,
+      sortBy: "updated",
+    });
+
+    expect(result.total).toBe(3);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].promptText).toBe("Prompt 1");
+  });
+
   it("filters by text search", async () => {
     const cards = [
       createReviewCard("t1", "forward", "Photosynthesis", "Answer"),

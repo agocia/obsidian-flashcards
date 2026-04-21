@@ -4,6 +4,8 @@ import type { SelectionContext } from "../../data/source-anchor-resolver";
 import type { CardBuilderService, PreviewCardPayload } from "../../services/card-builder-service";
 import type { GenerateTemplateInput } from "../../parsing/template-generator";
 
+type DeckOption = { id: string; name: string };
+
 /**
  * Builder panel — card creation surface mounted inside an Obsidian side pane.
  */
@@ -15,6 +17,11 @@ export class BuilderDrawer {
   private selectionContext?: SelectionContext;
   private onCreated?: () => void;
   private onOpenSourceNote?: (filePath: string) => void;
+  private onPickSourceNote?: (
+    modeOverride: GenerateTemplateInput["mode"],
+    onAttach: (selectionContext: SelectionContext) => void
+  ) => void;
+  private onCreateDeck?: (name: string) => Promise<DeckOption>;
   private onRequestClose?: () => void;
   private previewTimer: number | null = null;
 
@@ -23,17 +30,27 @@ export class BuilderDrawer {
   private backMarkdown = "";
   private clozeMarkdown = "";
   private deckId = "";
+  private newDeckName = "";
+  private isDeckCreatorOpen = false;
+  private isCreatingDeck = false;
 
   constructor(
     service: CardBuilderService,
     repository: PluginDataRepository,
     onCreated?: () => void,
-    onOpenSourceNote?: (filePath: string) => void
+    onOpenSourceNote?: (filePath: string) => void,
+    onPickSourceNote?: (
+      modeOverride: GenerateTemplateInput["mode"],
+      onAttach: (selectionContext: SelectionContext) => void
+    ) => void,
+    onCreateDeck?: (name: string) => Promise<DeckOption>
   ) {
     this.service = service;
     this.repository = repository;
     this.onCreated = onCreated;
     this.onOpenSourceNote = onOpenSourceNote;
+    this.onPickSourceNote = onPickSourceNote;
+    this.onCreateDeck = onCreateDeck;
   }
 
   mount(container: HTMLElement, onRequestClose?: () => void): void {
@@ -62,6 +79,8 @@ export class BuilderDrawer {
     this.frontMarkdown = "";
     this.backMarkdown = "";
     this.clozeMarkdown = "";
+    this.newDeckName = "";
+    this.isDeckCreatorOpen = false;
 
     if (selectionContext) {
       const text = selectionContext.fileContent.slice(
@@ -93,7 +112,7 @@ export class BuilderDrawer {
       cls: "srf-builder-drawer__subtitle",
       text: this.selectionContext
         ? `Source: ${this.selectionContext.noteTitle}`
-        : "Choose a note or selection, then shape it into a study card.",
+        : "Manual card. Source is optional; just type and save.",
     });
 
     const closeBtn = header.createEl("button", {
@@ -143,8 +162,20 @@ export class BuilderDrawer {
     } else {
       sourceCard.createDiv({
         cls: "srf-text-tertiary",
-        text: "No source selected.",
+        text: "No source selected. This card will live in the deck without linking back to a note.",
       });
+      if (this.onPickSourceNote) {
+        const attachBtn = sourceCard.createEl("button", {
+          cls: "srf-btn srf-btn--ghost srf-builder-drawer__source-action",
+          text: "Attach Source Note",
+          attr: { type: "button" },
+        });
+        attachBtn.addEventListener("click", () => {
+          this.onPickSourceNote?.(this.mode, (selectionContext) => {
+            this.attachSourceContext(selectionContext);
+          });
+        });
+      }
     }
 
     const workspace = body.createDiv({ cls: "srf-builder-drawer__workspace" });
@@ -155,20 +186,27 @@ export class BuilderDrawer {
     formCol.createEl("h3", { cls: "srf-builder-drawer__col-heading", text: "Card content" });
     const form = formCol.createEl("form", { cls: "srf-builder-drawer__form" });
 
-    const deckLabel = form.createEl("label", { cls: "srf-form-label" });
+    const deckField = form.createDiv({ cls: "srf-builder-drawer__deck-field" });
+    const deckLabel = deckField.createEl("label", { cls: "srf-form-label" });
     deckLabel.textContent = "Deck";
-    const deckSelect = form.createEl("select", { cls: "srf-select" }) as HTMLSelectElement;
-    this.repository
-      .snapshot()
-      .decks
-      .filter((deck) => !deck.archived)
-      .forEach((deck) => {
-        const option = deckSelect.createEl("option", { value: deck.id, text: deck.name });
-        if (deck.id === this.deckId) option.selected = true;
-      });
+    const deckRow = deckField.createDiv({ cls: "srf-builder-drawer__deck-row" });
+    const deckSelect = deckRow.createEl("select", { cls: "srf-select" }) as HTMLSelectElement;
+    this.renderDeckOptions(deckSelect);
     deckSelect.addEventListener("change", () => {
       this.deckId = deckSelect.value;
     });
+    const deckToggle = deckRow.createEl("button", {
+      cls: "srf-btn srf-btn--ghost",
+      text: this.isDeckCreatorOpen ? "Hide" : "New Deck",
+      attr: { type: "button" },
+    });
+    deckToggle.addEventListener("click", () => {
+      this.isDeckCreatorOpen = !this.isDeckCreatorOpen;
+      this.render();
+    });
+    if (this.isDeckCreatorOpen) {
+      this.renderDeckCreator(deckField);
+    }
 
     if (this.mode === "cloze") {
       const clozeLabel = form.createEl("label", { cls: "srf-form-label" });
@@ -313,11 +351,6 @@ export class BuilderDrawer {
   }
 
   private async save(addAnother: boolean): Promise<void> {
-    if (!this.selectionContext) {
-      new Notice("Pick a source note or selection first.");
-      return;
-    }
-
     try {
       await this.service.createFromSelection({
         selectionContext: this.selectionContext,
@@ -344,6 +377,93 @@ export class BuilderDrawer {
       const message = err instanceof Error ? err.message : "Could not save card.";
       new Notice(message);
     }
+  }
+
+  private renderDeckOptions(select: HTMLSelectElement): void {
+    const decks = this.repository.snapshot().decks.filter((deck) => !deck.archived);
+    if (!this.deckId || !decks.some((deck) => deck.id === this.deckId)) {
+      this.deckId = decks[0]?.id ?? "";
+    }
+    decks.forEach((deck) => {
+      const option = select.createEl("option", { value: deck.id, text: deck.name });
+      if (deck.id === this.deckId) option.selected = true;
+    });
+  }
+
+  private renderDeckCreator(container: HTMLElement): void {
+    const form = container.createEl("form", { cls: "srf-deck-editor srf-deck-editor--compact srf-builder-drawer__deck-create" });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void this.createDeck();
+    });
+    const input = form.createEl("input", {
+      cls: "srf-input srf-deck-editor__input",
+      type: "text",
+      placeholder: "Deck name",
+    }) as HTMLInputElement;
+    input.value = this.newDeckName;
+
+    const create = form.createEl("button", {
+      cls: "srf-btn srf-btn--primary",
+      text: "Create",
+      attr: { type: "button" },
+    }) as HTMLButtonElement;
+    const syncState = () => {
+      create.disabled = this.isCreatingDeck || !input.value.trim() || !this.onCreateDeck;
+    };
+    input.addEventListener("input", () => {
+      this.newDeckName = input.value;
+      syncState();
+    });
+    create.addEventListener("click", () => void this.createDeck());
+    syncState();
+  }
+
+  private async createDeck(): Promise<void> {
+    if (!this.onCreateDeck || this.isCreatingDeck) return;
+    const name = this.newDeckName.trim();
+    if (!name) {
+      new Notice("Deck name is required.");
+      return;
+    }
+
+    this.isCreatingDeck = true;
+    let shouldRender = false;
+    try {
+      const deck = await this.onCreateDeck(name);
+      this.deckId = deck.id;
+      this.newDeckName = "";
+      this.isDeckCreatorOpen = false;
+      new Notice(`Deck created: ${deck.name}`);
+      shouldRender = true;
+    } catch (error) {
+      console.error("[SRF] Create deck failed:", error);
+      new Notice(error instanceof Error ? error.message : "Could not create deck.");
+      shouldRender = true;
+    } finally {
+      this.isCreatingDeck = false;
+    }
+
+    if (shouldRender) {
+      this.render();
+    }
+  }
+
+  private attachSourceContext(selectionContext: SelectionContext): void {
+    this.selectionContext = selectionContext;
+    const selectedText = selectionContext.fileContent
+      .slice(selectionContext.startOffset, selectionContext.endOffset)
+      .trim();
+
+    if (selectedText) {
+      if (this.mode === "cloze" && !this.clozeMarkdown.trim()) {
+        this.clozeMarkdown = selectedText;
+      } else if (this.mode !== "cloze" && !this.frontMarkdown.trim()) {
+        this.frontMarkdown = selectedText;
+      }
+    }
+
+    this.render();
   }
 
   close(): void {

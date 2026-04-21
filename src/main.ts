@@ -322,7 +322,10 @@ export default class FlashcardsPlugin extends Plugin {
       () => {
         void this.refreshOpenViews();
       },
-      (filePath) => void this.openSourceNote(filePath)
+      (filePath) => void this.openSourceNote(filePath),
+      (modeOverride, onAttach) =>
+        this.pickSourceNoteForBuilder(modeOverride, onAttach),
+      (name) => this.libraryService.createDeck({ name })
     );
 
     // ── Register views ────────────────────────────────────────────────────
@@ -331,7 +334,7 @@ export default class FlashcardsPlugin extends Plugin {
         leaf,
         this.dashboardService,
         this.router,
-        () => this.openBuilderFromActiveNote(),
+        () => this.openBlankBuilder(),
         () => void this.router.openLibrary()
       )
     );
@@ -352,7 +355,7 @@ export default class FlashcardsPlugin extends Plugin {
         leaf,
         this.libraryService,
         this.repository,
-        () => this.openBuilderFromActiveNote(),
+        () => this.openBlankBuilder(),
         (filePath) => void this.openSourceNote(filePath)
       )
     );
@@ -394,6 +397,12 @@ export default class FlashcardsPlugin extends Plugin {
       editorCallback: (editor, ctx) => {
         this.openBuilderFromEditor(editor, ctx);
       },
+    });
+
+    this.addCommand({
+      id: "create-blank-card",
+      name: "Create Blank Card",
+      callback: () => this.openBlankBuilder(),
     });
 
     this.addCommand({
@@ -554,6 +563,12 @@ export default class FlashcardsPlugin extends Plugin {
     this.pickSourceNote(modeOverride);
   }
 
+  private openBlankBuilder(
+    modeOverride?: GenerateTemplateInput["mode"]
+  ): void {
+    void this.openBuilderPane(undefined, modeOverride);
+  }
+
   private async refreshOpenViews(): Promise<void> {
     const dashboardLeaves = this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE);
     for (const leaf of dashboardLeaves) {
@@ -603,10 +618,38 @@ export default class FlashcardsPlugin extends Plugin {
     }).open();
   }
 
+  private pickSourceNoteForBuilder(
+    modeOverride: GenerateTemplateInput["mode"],
+    onAttach: (selectionContext: SelectionContext) => void
+  ): void {
+    const files = this.app.vault.getMarkdownFiles();
+    if (files.length === 0) {
+      new Notice("No Markdown notes found in this vault.");
+      return;
+    }
+
+    new NotePickerModal(this.app, files, (file) => {
+      void this.resolveSourceContextFromFile(file).then((selectionContext) => {
+        if (!selectionContext) return;
+        onAttach(selectionContext);
+        new Notice(`Source attached for ${modeOverride} card.`);
+      });
+    }).open();
+  }
+
   private async openBuilderFromFile(
     file: TFile,
     modeOverride?: GenerateTemplateInput["mode"]
   ): Promise<void> {
+    const selectionContext = await this.resolveSourceContextFromFile(file);
+    if (!selectionContext) return;
+
+    void this.openBuilderPane(selectionContext, modeOverride);
+  }
+
+  private async resolveSourceContextFromFile(
+    file: TFile
+  ): Promise<SelectionContext | null> {
     try {
       const fileContent = await this.app.vault.read(file);
       const selectionContext = resolveSelectionContext({
@@ -619,13 +662,14 @@ export default class FlashcardsPlugin extends Plugin {
 
       if (!selectionContext) {
         new Notice("Pick a note with some non-empty content first.");
-        return;
+        return null;
       }
 
-      void this.openBuilderPane(selectionContext, modeOverride);
+      return selectionContext;
     } catch (error) {
       console.error("[SRF] Open builder from file failed:", error);
       new Notice("Could not open that note for card creation.");
+      return null;
     }
   }
 

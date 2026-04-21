@@ -14,6 +14,8 @@ It lets you create cards from note selections, review them on an FSRS schedule, 
 - Bulk **move**, **tag**, **suspend**, **unsuspend**, and **delete** cards
 - Open the original source note directly from the builder or library
 - Export and import plugin data as JSON or CSV
+- Create manual cards without selecting a source note first
+- Attach a source note later from the builder when you want context
 
 ## Install on another computer
 
@@ -74,6 +76,8 @@ For active plugin development, point your vault plugin folder at this repo and r
 5. Open **Flashcards** from the ribbon
 6. Start a review session from the dashboard
 
+You can also run **Create Blank Card** or click **Create Card** from the dashboard/library to make a card without any source note. Source context is optional: use **Attach Source Note** inside the builder if you want to link the card back to a note later.
+
 ## Main UI surfaces
 
 ### Dashboard
@@ -93,6 +97,7 @@ The library is the management surface for the whole collection. It supports:
 
 - search by prompt, answer, deck, tag, and source note
 - filters for deck, tag, state, and source file
+- deck-directory navigation with paged rendering so large libraries do not mount every card at once
 - deck creation from the library header or directly inside the move tray
 - bulk actions through an inline action tray
 - direct jump back to the source note
@@ -100,6 +105,8 @@ The library is the management surface for the whole collection. It supports:
 ### Builder Drawer
 
 The builder opens in Obsidian's right sidebar so it behaves like a native side panel. It is designed for quick capture while keeping the source note visible and reachable.
+
+The builder supports both source-backed cards and manual cards. Manual cards use an internal blank source anchor, so they are not forced to point to an Obsidian note. Use the deck selector's **New Deck** action when the target deck does not exist yet.
 
 ### Review View
 

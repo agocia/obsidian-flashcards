@@ -38,6 +38,8 @@ export class LibraryView {
     sortDirection: "asc",
   };
 
+  private readonly pageSize = 100;
+  private pageIndex = 0;
   private selectedRowIds = new Set<string>();
   private bulkHost: HTMLElement | null = null;
   private lastRows: LibraryRow[] = [];
@@ -91,7 +93,11 @@ export class LibraryView {
   private async renderContent(shell: HTMLElement): Promise<{ total: number; rows: LibraryRow[] } | null> {
     let result;
     try {
-      result = await this.service.query(this.query);
+      result = await this.service.query({
+        ...this.query,
+        limit: this.pageSize,
+        offset: this.pageIndex * this.pageSize,
+      });
     } catch {
       this.renderHero(shell, 0, 0);
       renderStateBanner(shell, {
@@ -100,6 +106,11 @@ export class LibraryView {
         body: "Try reloading the plugin.",
       });
       return null;
+    }
+
+    if (result.total > 0 && result.rows.length === 0 && this.pageIndex > 0) {
+      this.pageIndex = Math.max(0, Math.ceil(result.total / this.pageSize) - 1);
+      return this.renderContent(shell);
     }
 
     const suspendedCount = result.rows.filter((row) => row.state === "suspended").length;
@@ -127,6 +138,8 @@ export class LibraryView {
       onSortChange: (sort) => this.update({ sortBy: sort as LibraryQueryInput["sortBy"] }),
     });
 
+    this.renderDeckDirectory(contentCard);
+
     if (result.rows.length === 0) {
       renderStateBanner(contentCard, {
         kind: "empty",
@@ -138,7 +151,7 @@ export class LibraryView {
       return result;
     }
 
-    this.renderListToolbar(contentCard, result.rows);
+    this.renderListToolbar(contentCard, result.rows, result.total);
 
     const list = contentCard.createDiv({ cls: "srf-library__list" });
     list.setAttribute("role", "list");
@@ -266,14 +279,52 @@ export class LibraryView {
 
     const stats = hero.createDiv({ cls: "srf-library__hero-stats" });
     this.renderHeroStat(stats, "Visible cards", String(total));
-    this.renderHeroStat(stats, "Suspended", String(suspendedCount));
+    this.renderHeroStat(stats, "Page suspended", String(suspendedCount));
     this.renderHeroStat(stats, "Selected", String(this.selectedRowIds.size));
   }
 
-  private renderListToolbar(container: HTMLElement, rows: LibraryRow[]): void {
+  private renderDeckDirectory(container: HTMLElement): void {
+    const selectedDeckId = this.query.deckIds[0] ?? "";
+    const directory = container.createDiv({ cls: "srf-library__directory" });
+    const header = directory.createDiv({ cls: "srf-library__directory-header" });
+    header.createDiv({ cls: "srf-library__directory-title", text: "Deck directory" });
+    header.createDiv({
+      cls: "srf-library__directory-hint",
+      text: "Jump by deck without rendering the whole collection at once.",
+    });
+
+    const rail = directory.createDiv({ cls: "srf-library__directory-rail" });
+    this.renderDeckDirectoryButton(rail, "All decks", "", !selectedDeckId);
+    this.decks.forEach((deck) => {
+      this.renderDeckDirectoryButton(rail, deck.name, deck.id, selectedDeckId === deck.id);
+    });
+  }
+
+  private renderDeckDirectoryButton(
+    container: HTMLElement,
+    label: string,
+    deckId: string,
+    selected: boolean
+  ): void {
+    const button = container.createEl("button", {
+      cls: `srf-library__directory-button ${selected ? "srf-library__directory-button--active" : ""}`,
+      text: label,
+      attr: { type: "button" },
+    });
+    button.addEventListener("click", () => {
+      void this.update({ deckIds: deckId ? [deckId] : [] });
+    });
+  }
+
+  private renderListToolbar(container: HTMLElement, rows: LibraryRow[], total: number): void {
     const toolbar = container.createDiv({ cls: "srf-library__list-toolbar" });
     const copy = toolbar.createDiv({ cls: "srf-library__list-toolbar-copy" });
-    copy.createDiv({ cls: "srf-library__list-count", text: `${rows.length} visible card${rows.length === 1 ? "" : "s"}` });
+    const start = total === 0 ? 0 : this.pageIndex * this.pageSize + 1;
+    const end = Math.min(total, this.pageIndex * this.pageSize + rows.length);
+    copy.createDiv({
+      cls: "srf-library__list-count",
+      text: `Showing ${start}-${end} of ${total} card${total === 1 ? "" : "s"}`,
+    });
     copy.createDiv({
       cls: "srf-library__list-hint",
       text: "Select cards, then move, tag, suspend, unsuspend, or delete from the action tray.",
@@ -294,6 +345,36 @@ export class LibraryView {
         visibleIds.forEach((id) => this.selectedRowIds.add(id));
       }
       void this.render();
+    });
+
+    this.renderPagination(actions, total);
+  }
+
+  private renderPagination(container: HTMLElement, total: number): void {
+    const pageCount = Math.max(1, Math.ceil(total / this.pageSize));
+    const prev = container.createEl("button", {
+      cls: "srf-btn srf-btn--ghost srf-library__page-button",
+      text: "Previous",
+      attr: { type: "button" },
+    });
+    prev.disabled = this.pageIndex <= 0;
+    prev.addEventListener("click", () => {
+      void this.goToPage(this.pageIndex - 1);
+    });
+
+    container.createSpan({
+      cls: "srf-library__page-status",
+      text: `${this.pageIndex + 1}/${pageCount}`,
+    });
+
+    const next = container.createEl("button", {
+      cls: "srf-btn srf-btn--ghost srf-library__page-button",
+      text: "Next",
+      attr: { type: "button" },
+    });
+    next.disabled = this.pageIndex >= pageCount - 1;
+    next.addEventListener("click", () => {
+      void this.goToPage(this.pageIndex + 1);
     });
   }
 
@@ -672,6 +753,16 @@ export class LibraryView {
 
   private async update(partial: Partial<LibraryQueryInput>): Promise<void> {
     this.query = { ...this.query, ...partial };
+    this.pageIndex = 0;
+    this.selectedRowIds.clear();
+    this.activeBulkEditor = null;
+    await this.render();
+  }
+
+  private async goToPage(pageIndex: number): Promise<void> {
+    this.pageIndex = Math.max(0, pageIndex);
+    this.selectedRowIds.clear();
+    this.activeBulkEditor = null;
     await this.render();
   }
 }

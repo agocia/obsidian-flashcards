@@ -16,6 +16,8 @@ export interface LibraryQueryInput {
   states: ReviewCardState[];
   sortBy: "due" | "updated" | "deck" | "ease";
   sortDirection: "asc" | "desc";
+  limit?: number;
+  offset?: number;
 }
 
 export interface LibraryRow {
@@ -144,10 +146,18 @@ export class LibraryService {
       });
     }
 
-    // Sort
     rows = sortLibraryRows(rows, input.sortBy, input.sortDirection);
 
-    return { total: rows.length, rows };
+    const total = rows.length;
+    const offset = Math.max(0, input.offset ?? 0);
+    const limit = input.limit && input.limit > 0 ? input.limit : null;
+    if (limit !== null) {
+      rows = rows.slice(offset, offset + limit);
+    } else if (offset > 0) {
+      rows = rows.slice(offset);
+    }
+
+    return { total, rows };
   }
 
   async bulkUpdate(input: BulkUpdateCardsInput): Promise<{ updatedCount: number }> {

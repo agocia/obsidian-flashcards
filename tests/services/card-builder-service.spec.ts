@@ -76,6 +76,33 @@ describe("CardBuilderService.createFromSelection", () => {
     expect(result.cards).toHaveLength(2);
   });
 
+  it("creates a manual basic card without a source context", async () => {
+    const result = await service.createFromSelection({
+      mode: "basic",
+      deckId,
+      tagIds: [],
+      frontMarkdown: "Manual question",
+      backMarkdown: "Manual answer",
+    });
+
+    expect(result.cards).toHaveLength(1);
+    expect(result.template.sourceAnchor.filePath).toBe("");
+    expect(result.template.sourceAnchor.noteTitle).toBe("Manual card");
+    expect(repo.snapshot().cards.some((card) => card.id === result.cards[0].id)).toBe(true);
+  });
+
+  it("creates a manual cloze card without a source context", async () => {
+    const result = await service.createFromSelection({
+      mode: "cloze",
+      deckId,
+      tagIds: [],
+      clozeMarkdown: "{{c1::Manual}} cloze",
+    });
+
+    expect(result.cards).toHaveLength(1);
+    expect(result.template.sourceAnchor.filePath).toBe("");
+  });
+
   it("throws SelectionEmptyError when selected text is blank", async () => {
     const ctx = makeCtx("   ", 0, 3);
     await expect(

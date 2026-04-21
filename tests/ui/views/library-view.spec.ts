@@ -211,6 +211,95 @@ describe("LibraryView", () => {
     expect(optionLabels.some((option) => option.value === "notes/Chemistry.md")).toBe(true);
   });
 
+  it("renders the deck directory and filters by deck without source requirements", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [
+        { id: "default", name: "Default" },
+        { id: "deck-2", name: "Exam Deck" },
+      ],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const deckButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Exam Deck"
+    ) as HTMLButtonElement | undefined;
+    deckButton?.click();
+    await flushDom();
+
+    expect(service.query).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        deckIds: ["deck-2"],
+        limit: 100,
+        offset: 0,
+      })
+    );
+  });
+
+  it("paginates the library instead of rendering every card at once", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockImplementation(async (input: { offset?: number }) => ({
+        total: 101,
+        rows: [
+          makeRow({
+            cardId: input.offset === 100 ? "card-101" : "card-1",
+            promptText: input.offset === 100 ? "Last card" : "First card",
+          }),
+        ],
+      })),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    expect(service.query).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        limit: 100,
+        offset: 0,
+      })
+    );
+
+    const nextButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Next"
+    ) as HTMLButtonElement | undefined;
+    nextButton?.click();
+    await flushDom();
+
+    expect(service.query).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        limit: 100,
+        offset: 100,
+      })
+    );
+    expect(container.textContent).toContain("Last card");
+  });
+
   it("moves selected cards from the inline bulk tray", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
