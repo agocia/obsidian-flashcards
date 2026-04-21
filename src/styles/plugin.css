@@ -300,10 +300,10 @@
 
 .srf-dashboard__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
   gap: 22px;
   padding: 28px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .srf-dashboard__hero-copy,
@@ -316,6 +316,7 @@
 }
 
 .srf-dashboard__hero-copy {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -351,8 +352,17 @@
 .srf-dashboard__deck-picker {
   display: grid;
   gap: 6px;
-  max-width: 360px;
+  width: min(100%, 420px);
+  min-width: 0;
   margin-top: 4px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--srf-accent-primary) 16%, var(--srf-border-subtle));
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-accent-primary) 5%, var(--srf-surface-elevated));
+}
+
+.srf-dashboard__deck-picker .srf-select {
+  min-width: 0;
 }
 
 .srf-library__hero-actions {
@@ -371,9 +381,10 @@
 
 .srf-dashboard__hero-aside {
   align-self: stretch;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   min-height: 168px;
   padding: 20px;
   border: 1px solid var(--srf-border-subtle);
@@ -387,12 +398,32 @@
   color: var(--srf-text-tertiary);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1.35;
+}
+
+.srf-dashboard__hero-scope {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  min-height: 26px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--srf-accent-primary) 22%, var(--srf-border-subtle));
+  border-radius: var(--srf-radius-pill);
+  background: var(--srf-accent-quiet);
+  color: var(--srf-accent-primary);
+  font-size: 12px;
+  font-weight: 560;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .srf-dashboard__hero-stat-value {
-  margin: 8px 0;
+  margin: 12px 0 8px;
   font-family: var(--srf-font-display);
-  font-size: 64px;
+  font-size: clamp(42px, 8vw, 64px);
   font-weight: 620;
   letter-spacing: -0.04em;
   line-height: 0.95;
@@ -1615,6 +1646,14 @@
   .srf-library__content {
     padding: 16px;
     border-radius: var(--srf-radius-lg);
+  }
+
+  .srf-dashboard__deck-picker {
+    width: 100%;
+  }
+
+  .srf-dashboard__hero-aside {
+    min-height: auto;
   }
 
   .srf-dashboard__tiles,

@@ -106,10 +106,19 @@ describe("DashboardView", () => {
     const view = new DashboardView(container, service as any, onStartReview);
     await view.render();
 
+    expect(container.querySelector(".srf-dashboard__hero-stat-label")?.textContent).toBe(
+      "Due right now"
+    );
+    expect(container.querySelector(".srf-dashboard__hero-scope")?.textContent).toBe(
+      "All decks"
+    );
+
     const select = container.querySelector(".srf-dashboard__deck-picker select") as HTMLSelectElement;
     select.value = "deck-b";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flushDom();
+
+    expect(container.querySelector(".srf-dashboard__hero-scope")?.textContent).toBe("Deck B");
 
     const startButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Start Review"

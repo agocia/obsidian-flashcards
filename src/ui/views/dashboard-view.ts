@@ -90,7 +90,11 @@ export class DashboardView {
     const heroAside = hero.createDiv({ cls: "srf-dashboard__hero-aside" });
     heroAside.createDiv({
       cls: "srf-dashboard__hero-stat-label",
-      text: `${reviewScopeLabel} due right now`,
+      text: "Due right now",
+    });
+    heroAside.createDiv({
+      cls: "srf-dashboard__hero-scope",
+      text: reviewScopeLabel,
     });
     heroAside.createDiv({
       cls: "srf-dashboard__hero-stat-value",
