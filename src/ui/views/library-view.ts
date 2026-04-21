@@ -134,53 +134,70 @@ export class LibraryView {
       return result;
     }
 
-    const tableWrap = contentCard.createDiv({ cls: "srf-library__table-wrap" });
-    const table = tableWrap.createEl("table", { cls: "srf-library__table" });
+    this.renderListToolbar(contentCard, result.rows);
 
-    const thead = table.createEl("thead");
-    const headerRow = thead.createEl("tr");
-    ["", "Prompt", "Deck", "Source Note", "Tags", "Due", "Ease", "Status"].forEach((col) => {
-      headerRow.createEl("th", { cls: "srf-library__th", text: col });
-    });
+    const list = contentCard.createDiv({ cls: "srf-library__list" });
+    list.setAttribute("role", "list");
 
-    const tbody = table.createEl("tbody");
     result.rows.forEach((row) => {
-      const tr = tbody.createEl("tr", { cls: "srf-library__row" });
-      this.applyRowSelectionState(tr, row.cardId);
+      const cardEl = list.createDiv({
+        cls: `srf-library-card srf-library-card--${row.state}`,
+      });
+      cardEl.setAttribute("role", "listitem");
+      this.applyRowSelectionState(cardEl, row.cardId);
 
-      tr.addEventListener("click", (event) => {
+      cardEl.addEventListener("click", (event) => {
         const target = event.target as HTMLElement | null;
         if (target?.closest("button,input,select,textarea,a,label")) return;
         const nextChecked = !this.selectedRowIds.has(row.cardId);
-        this.toggleRowSelection(row.cardId, nextChecked, tr);
-        const checkbox = tr.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        this.toggleRowSelection(row.cardId, nextChecked, cardEl);
+        const checkbox = cardEl.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
         if (checkbox) checkbox.checked = nextChecked;
       });
 
-      const checkTd = tr.createEl("td", { cls: "srf-library__td srf-library__td--check" });
-      const checkbox = checkTd.createEl("input") as HTMLInputElement;
+      const checkLabel = cardEl.createEl("label", { cls: "srf-library-card__check" });
+      const checkbox = checkLabel.createEl("input") as HTMLInputElement;
       checkbox.type = "checkbox";
       checkbox.checked = this.selectedRowIds.has(row.cardId);
       checkbox.addEventListener("click", (event) => event.stopPropagation());
       checkbox.addEventListener("change", () => {
-        this.toggleRowSelection(row.cardId, checkbox.checked, tr);
+        this.toggleRowSelection(row.cardId, checkbox.checked, cardEl);
       });
+      checkLabel.createSpan({ cls: "srf-library-card__check-mark" });
 
-      const promptTd = tr.createEl("td", {
-        cls: "srf-library__td srf-library__td--prompt",
+      const body = cardEl.createDiv({ cls: "srf-library-card__body" });
+      const header = body.createDiv({ cls: "srf-library-card__header" });
+      const copy = header.createDiv({ cls: "srf-library-card__copy" });
+      copy.createDiv({
+        cls: "srf-library-card__prompt",
+        text: row.promptText || "Untitled prompt",
       });
-      promptTd.createDiv({ cls: "srf-library__prompt-text", text: row.promptText });
-      promptTd.createDiv({
-        cls: "srf-library__prompt-meta",
+      copy.createDiv({
+        cls: "srf-library-card__source-path",
         text: row.sourceFile ? fileLabel(row.sourceFile) : "No source note",
       });
 
-      tr.createEl("td", { cls: "srf-library__td srf-library__td--deck", text: row.deckName });
-
-      const sourceTd = tr.createEl("td", {
-        cls: "srf-library__td srf-library__td--source-note",
+      const stateBadge = header.createSpan({
+        cls: `srf-library-card__state srf-library-card__state--${row.state}`,
+        text: row.state,
       });
-      const sourceBtn = sourceTd.createEl("button", {
+      stateBadge.setAttribute("aria-label", `Card state: ${row.state}`);
+
+      const tags = body.createDiv({ cls: "srf-library-card__tags" });
+      if (row.tags.length > 0) {
+        row.tags.forEach((tag) => tags.createSpan({ cls: "srf-tag-pill", text: tag }));
+      } else {
+        tags.createSpan({ cls: "srf-library-card__empty-meta", text: "No tags yet" });
+      }
+
+      const meta = body.createDiv({ cls: "srf-library-card__meta-grid" });
+      this.renderMetaItem(meta, "Deck", row.deckName || "No deck");
+      this.renderMetaItem(meta, "Due", row.dueAt ? formatDue(row.dueAt) : "Not scheduled");
+      this.renderMetaItem(meta, "Ease", row.difficulty != null ? row.difficulty.toFixed(1) : "Fresh");
+
+      const sourceItem = meta.createDiv({ cls: "srf-library-card__meta-item srf-library-card__meta-item--source" });
+      sourceItem.createDiv({ cls: "srf-library-card__meta-label", text: "Source" });
+      const sourceBtn = sourceItem.createEl("button", {
         cls: "srf-btn srf-btn--ghost srf-library__source-note-btn",
         text: row.sourceNoteTitle || fileLabel(row.sourceFile),
       });
@@ -195,27 +212,6 @@ export class LibraryView {
       } else {
         sourceBtn.setAttribute("title", row.sourceFile);
       }
-
-      const tagsTd = tr.createEl("td", { cls: "srf-library__td srf-library__td--tags" });
-      if (row.tags.length > 0) {
-        row.tags.forEach((tag) => tagsTd.createSpan({ cls: "srf-tag-pill", text: tag }));
-      } else {
-        tagsTd.createSpan({ cls: "srf-library__empty-meta", text: "No tags" });
-      }
-
-      tr.createEl("td", {
-        cls: "srf-library__td srf-library__td--due",
-        text: row.dueAt ? formatDue(row.dueAt) : "—",
-      });
-      tr.createEl("td", {
-        cls: "srf-library__td srf-library__td--ease",
-        text: row.difficulty != null ? row.difficulty.toFixed(1) : "—",
-      });
-
-      const stateTd = tr.createEl("td", {
-        cls: `srf-library__td srf-library__td--state srf-library__state-badge srf-library__state-badge--${row.state}`,
-      });
-      stateTd.textContent = row.state;
     });
 
     this.bulkHost = contentCard.createDiv({ cls: "srf-library__bulk-host" });
@@ -238,6 +234,39 @@ export class LibraryView {
     this.renderHeroStat(stats, "Visible cards", String(total));
     this.renderHeroStat(stats, "Suspended", String(suspendedCount));
     this.renderHeroStat(stats, "Selected", String(this.selectedRowIds.size));
+  }
+
+  private renderListToolbar(container: HTMLElement, rows: LibraryRow[]): void {
+    const toolbar = container.createDiv({ cls: "srf-library__list-toolbar" });
+    const copy = toolbar.createDiv({ cls: "srf-library__list-toolbar-copy" });
+    copy.createDiv({ cls: "srf-library__list-count", text: `${rows.length} visible card${rows.length === 1 ? "" : "s"}` });
+    copy.createDiv({
+      cls: "srf-library__list-hint",
+      text: "Select cards, then move, tag, suspend, unsuspend, or delete from the action tray.",
+    });
+
+    const actions = toolbar.createDiv({ cls: "srf-library__list-toolbar-actions" });
+    const visibleIds = rows.map((row) => row.cardId);
+    const allVisibleSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => this.selectedRowIds.has(id));
+    const selectBtn = actions.createEl("button", {
+      cls: "srf-btn srf-btn--secondary",
+      text: allVisibleSelected ? "Clear visible" : "Select visible",
+    });
+    selectBtn.addEventListener("click", () => {
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => this.selectedRowIds.delete(id));
+      } else {
+        visibleIds.forEach((id) => this.selectedRowIds.add(id));
+      }
+      void this.render();
+    });
+  }
+
+  private renderMetaItem(container: HTMLElement, label: string, value: string): void {
+    const item = container.createDiv({ cls: "srf-library-card__meta-item" });
+    item.createDiv({ cls: "srf-library-card__meta-label", text: label });
+    item.createDiv({ cls: "srf-library-card__meta-value", text: value });
   }
 
   private renderHeroStat(container: HTMLElement, label: string, value: string): void {
@@ -368,15 +397,19 @@ export class LibraryView {
       placeholder: "biology, chapter-3, formulas",
     }) as HTMLInputElement;
     input.value = this.bulkTagValue;
-    input.addEventListener("input", () => {
-      this.bulkTagValue = input.value;
-    });
 
     const apply = editor.createEl("button", {
       cls: "srf-btn srf-btn--primary",
       text: "Apply tags",
     });
-    apply.disabled = this.isApplyingBulkAction || !this.bulkTagValue.trim();
+    const syncApplyState = () => {
+      apply.disabled = this.isApplyingBulkAction || !this.bulkTagValue.trim();
+    };
+    input.addEventListener("input", () => {
+      this.bulkTagValue = input.value;
+      syncApplyState();
+    });
+    syncApplyState();
     apply.addEventListener("click", () => this.applyTags());
   }
 
@@ -468,8 +501,10 @@ export class LibraryView {
   private applyRowSelectionState(rowEl: HTMLElement, cardId: string): void {
     if (this.selectedRowIds.has(cardId)) {
       rowEl.addClass("srf-library__row--selected");
+      rowEl.addClass("srf-library-card--selected");
     } else {
       rowEl.removeClass("srf-library__row--selected");
+      rowEl.removeClass("srf-library-card--selected");
     }
   }
 

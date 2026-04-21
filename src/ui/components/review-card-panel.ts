@@ -18,12 +18,23 @@ export function renderReviewCardPanel(
   container.empty();
 
   const card = container.createDiv({ cls: "srf-review-card" });
+  card.createDiv({ cls: "srf-review-card__ambient" });
 
   const face = card.createDiv({ cls: "srf-review-card__face" });
 
   if (opts.variantKey === "reverse") {
     face.addClass("srf-review-card__face--reverse");
   }
+
+  const chrome = face.createDiv({ cls: "srf-review-card__chrome" });
+  chrome.createSpan({
+    cls: "srf-review-card__variant",
+    text: formatVariant(opts.variantKey),
+  });
+  chrome.createSpan({
+    cls: "srf-review-card__state",
+    text: opts.revealed ? "Answer" : "Prompt",
+  });
 
   const promptEl = face.createDiv({ cls: "srf-review-card__prompt" });
   if (opts.renderMarkdown) {
@@ -48,4 +59,11 @@ export function renderReviewCardPanel(
   }
 
   return card;
+}
+
+function formatVariant(variantKey?: string): string {
+  if (!variantKey) return "Basic";
+  if (variantKey === "reverse") return "Reverse";
+  if (variantKey.startsWith("cloze")) return "Cloze";
+  return "Basic";
 }

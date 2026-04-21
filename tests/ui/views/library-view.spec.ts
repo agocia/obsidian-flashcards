@@ -204,4 +204,106 @@ describe("LibraryView", () => {
     expect(optionLabels.some((option) => option.label === "chemistry")).toBe(true);
     expect(optionLabels.some((option) => option.value === "notes/Chemistry.md")).toBe(true);
   });
+
+  it("moves selected cards from the inline bulk tray", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 1 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [
+        { id: "default", name: "Default" },
+        { id: "deck-2", name: "Exam Deck" },
+      ],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const moveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Move"
+    ) as HTMLButtonElement | undefined;
+    moveButton?.click();
+
+    const deckSelect = container.querySelector(".srf-library__bulk-select") as HTMLSelectElement;
+    deckSelect.value = "deck-2";
+    deckSelect.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const applyButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Apply move"
+    ) as HTMLButtonElement | undefined;
+    applyButton?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(service.bulkUpdate).toHaveBeenCalledWith({
+      action: "move",
+      cardIds: ["card-1"],
+      deckId: "deck-2",
+    });
+  });
+
+  it("adds tags to selected cards from the inline bulk tray", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 1 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const tagButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Add tags"
+    ) as HTMLButtonElement | undefined;
+    tagButton?.click();
+
+    const tagInput = container.querySelector(".srf-library__bulk-input") as HTMLInputElement;
+    tagInput.value = "biology, exam";
+    tagInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const applyButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Apply tags"
+    ) as HTMLButtonElement | undefined;
+    applyButton?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(service.bulkUpdate).toHaveBeenCalledWith({
+      action: "tag",
+      cardIds: ["card-1"],
+      tagIds: ["biology", "exam"],
+      createMissingTags: true,
+    });
+  });
 });

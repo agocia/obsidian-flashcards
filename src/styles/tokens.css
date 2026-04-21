@@ -1,59 +1,84 @@
-/* ─── CSS Custom Properties / Design Tokens ──────────────────────────────────
-   Prefix: --srf-
-   Light theme (default) | Dark theme via .theme-dark
-─────────────────────────────────────────────────────────────────────────── */
-
 :root,
 .theme-light {
-  --srf-bg-primary:            var(--background-primary, #FFFFFF);
-  --srf-bg-secondary:          var(--background-secondary, #F6F7F8);
-  --srf-surface-primary:       var(--background-primary, #FFFFFF);
-  --srf-surface-elevated:      var(--background-primary, #FFFFFF);
-  --srf-surface-tint:          var(--background-modifier-hover, #F1F3F5);
-  --srf-text-primary:          var(--text-normal, #1F2328);
-  --srf-text-secondary:        var(--text-muted, #59636E);
-  --srf-text-tertiary:         var(--text-faint, #7D8590);
-  --srf-border-subtle:         var(--background-modifier-border, #D0D7DE);
-  --srf-accent-primary:        var(--interactive-accent, #2563EB);
-  --srf-accent-primary-hover:  var(--interactive-accent-hover, #1D4ED8);
-  --srf-accent-soft:           color-mix(in srgb, var(--interactive-accent, #2563EB) 12%, transparent);
-  --srf-success:               var(--color-green, #1A7F37);
-  --srf-warning:               var(--color-orange, #B45309);
-  --srf-danger:                var(--color-red, #CF222E);
-  --srf-info:                  var(--color-blue, #0969DA);
-  --srf-shadow-color:          rgba(31, 35, 40, 0.10);
+  --srf-font-display: "SF Pro Display", "Avenir Next", "Helvetica Neue", sans-serif;
+  --srf-font-body: "SF Pro Text", "Avenir Next", "Helvetica Neue", sans-serif;
 
-  --srf-shadow-xs: 0 1px 2px rgba(31,35,40,0.06);
-  --srf-shadow-sm: 0 4px 12px rgba(31,35,40,0.08);
-  --srf-shadow-md: 0 10px 30px rgba(31,35,40,0.12);
-  --srf-shadow-lg: 0 20px 40px rgba(31,35,40,0.18);
+  --srf-bg-primary: var(--background-primary, #fbfbfc);
+  --srf-bg-secondary: var(--background-secondary, #f3f4f6);
+  --srf-surface-primary: color-mix(in srgb, var(--background-primary, #ffffff) 92%, transparent);
+  --srf-surface-elevated: color-mix(in srgb, var(--background-primary, #ffffff) 84%, transparent);
+  --srf-surface-tint: color-mix(in srgb, var(--background-modifier-hover, #eef1f5) 72%, transparent);
+  --srf-surface-glass: color-mix(in srgb, var(--background-primary, #ffffff) 78%, transparent);
+  --srf-surface-strong: color-mix(in srgb, var(--background-primary, #ffffff) 96%, var(--text-normal, #101318) 4%);
 
-  --srf-chrome-bg: color-mix(in srgb, var(--background-primary, #FFFFFF) 88%, transparent);
+  --srf-text-primary: var(--text-normal, #111318);
+  --srf-text-secondary: var(--text-muted, #59616d);
+  --srf-text-tertiary: var(--text-faint, #818895);
+  --srf-border-subtle: color-mix(in srgb, var(--background-modifier-border, #d8dde5) 74%, transparent);
+  --srf-border-strong: color-mix(in srgb, var(--background-modifier-border, #cfd6df) 92%, var(--text-normal, #101318) 8%);
+
+  --srf-accent-primary: var(--interactive-accent, #0a84ff);
+  --srf-accent-primary-hover: var(--interactive-accent-hover, #0069d9);
+  --srf-accent-soft: color-mix(in srgb, var(--interactive-accent, #0a84ff) 13%, transparent);
+  --srf-accent-quiet: color-mix(in srgb, var(--interactive-accent, #0a84ff) 8%, var(--background-primary, #ffffff));
+
+  --srf-success: var(--color-green, #1f8f55);
+  --srf-warning: var(--color-orange, #c06a00);
+  --srf-danger: var(--color-red, #d33b32);
+  --srf-info: var(--color-blue, #0a84ff);
+
+  --srf-radius-xs: 8px;
+  --srf-radius-sm: 12px;
+  --srf-radius-md: 18px;
+  --srf-radius-lg: 24px;
+  --srf-radius-xl: 32px;
+  --srf-radius-pill: 999px;
+
+  --srf-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --srf-shadow-sm: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --srf-shadow-md: 0 18px 55px rgba(15, 23, 42, 0.12);
+  --srf-shadow-lg: 0 28px 80px rgba(15, 23, 42, 0.18);
+  --srf-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+
+  --srf-canvas-aura:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--interactive-accent, #0a84ff) 13%, transparent), transparent 32%),
+    radial-gradient(circle at 82% 8%, rgba(114, 132, 158, 0.12), transparent 34%),
+    linear-gradient(180deg, var(--background-primary, #fbfbfc), var(--background-secondary, #f3f4f6));
 }
 
 .theme-dark {
-  --srf-bg-primary:            var(--background-primary, #1E1E1E);
-  --srf-bg-secondary:          var(--background-secondary, #262626);
-  --srf-surface-primary:       var(--background-primary, #1E1E1E);
-  --srf-surface-elevated:      var(--background-secondary, #262626);
-  --srf-surface-tint:          var(--background-modifier-hover, #303030);
-  --srf-text-primary:          var(--text-normal, #E6EDF3);
-  --srf-text-secondary:        var(--text-muted, #B7BDC5);
-  --srf-text-tertiary:         var(--text-faint, #848D97);
-  --srf-border-subtle:         var(--background-modifier-border, #3D444D);
-  --srf-accent-primary:        var(--interactive-accent, #60A5FA);
-  --srf-accent-primary-hover:  var(--interactive-accent-hover, #93C5FD);
-  --srf-accent-soft:           color-mix(in srgb, var(--interactive-accent, #60A5FA) 18%, transparent);
-  --srf-success:               var(--color-green, #56D364);
-  --srf-warning:               var(--color-orange, #E3B341);
-  --srf-danger:                var(--color-red, #F85149);
-  --srf-info:                  var(--color-blue, #79C0FF);
-  --srf-shadow-color:          rgba(0, 0, 0, 0.32);
+  --srf-bg-primary: var(--background-primary, #17181c);
+  --srf-bg-secondary: var(--background-secondary, #202226);
+  --srf-surface-primary: color-mix(in srgb, var(--background-primary, #17181c) 88%, white 2%);
+  --srf-surface-elevated: color-mix(in srgb, var(--background-secondary, #202226) 86%, white 4%);
+  --srf-surface-tint: color-mix(in srgb, var(--background-modifier-hover, #2b2e35) 76%, transparent);
+  --srf-surface-glass: color-mix(in srgb, var(--background-primary, #17181c) 74%, transparent);
+  --srf-surface-strong: color-mix(in srgb, var(--background-secondary, #202226) 92%, white 8%);
 
-  --srf-shadow-xs: 0 1px 2px rgba(0,0,0,0.16);
-  --srf-shadow-sm: 0 4px 12px rgba(0,0,0,0.20);
-  --srf-shadow-md: 0 10px 30px rgba(0,0,0,0.28);
-  --srf-shadow-lg: 0 20px 40px rgba(0,0,0,0.36);
+  --srf-text-primary: var(--text-normal, #f3f5f7);
+  --srf-text-secondary: var(--text-muted, #b4bac4);
+  --srf-text-tertiary: var(--text-faint, #848b97);
+  --srf-border-subtle: color-mix(in srgb, var(--background-modifier-border, #3a3f49) 78%, transparent);
+  --srf-border-strong: color-mix(in srgb, var(--background-modifier-border, #4a515f) 92%, white 6%);
 
-  --srf-chrome-bg: color-mix(in srgb, var(--background-primary, #1E1E1E) 88%, transparent);
+  --srf-accent-primary: var(--interactive-accent, #66aaff);
+  --srf-accent-primary-hover: var(--interactive-accent-hover, #8fc1ff);
+  --srf-accent-soft: color-mix(in srgb, var(--interactive-accent, #66aaff) 18%, transparent);
+  --srf-accent-quiet: color-mix(in srgb, var(--interactive-accent, #66aaff) 12%, var(--background-primary, #17181c));
+
+  --srf-success: var(--color-green, #62d184);
+  --srf-warning: var(--color-orange, #f0b45a);
+  --srf-danger: var(--color-red, #ff6b63);
+  --srf-info: var(--color-blue, #82bdff);
+
+  --srf-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --srf-shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.26);
+  --srf-shadow-md: 0 18px 55px rgba(0, 0, 0, 0.34);
+  --srf-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.42);
+  --srf-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  --srf-canvas-aura:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--interactive-accent, #66aaff) 18%, transparent), transparent 32%),
+    radial-gradient(circle at 82% 8%, rgba(210, 224, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, var(--background-primary, #17181c), var(--background-secondary, #202226));
 }

@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "Anki-class spaced repetition for Obsidian",
   "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agocia/obsidian-flashcards.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agocia/obsidian-flashcards/issues"
+  },
+  "homepage": "https://github.com/agocia/obsidian-flashcards#readme",
   "scripts": {
     "dev": "node esbuild.mjs",
     "build": "node esbuild.mjs production",

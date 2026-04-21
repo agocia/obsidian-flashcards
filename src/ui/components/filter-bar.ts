@@ -21,6 +21,7 @@ export interface FilterBarOptions {
 }
 
 export function renderFilterBar(container: HTMLElement, opts: FilterBarOptions): HTMLElement {
+  const sourceListId = `srf-source-file-options-${++filterBarInstanceId}`;
   const shell = container.createDiv({ cls: "srf-filter-shell" });
   const header = shell.createDiv({ cls: "srf-filter-shell__header" });
   header.createDiv({ cls: "srf-filter-shell__eyebrow", text: "Refine library" });
@@ -49,10 +50,10 @@ export function renderFilterBar(container: HTMLElement, opts: FilterBarOptions):
   }) as HTMLInputElement;
   sourceInput.placeholder = "Source note path";
   sourceInput.value = opts.sourceFileValue;
-  sourceInput.setAttribute("list", "srf-source-file-options");
+  sourceInput.setAttribute("list", sourceListId);
   sourceInput.addEventListener("input", () => opts.onSourceFileChange(sourceInput.value));
 
-  const sourceList = sourceWrap.createEl("datalist", { attr: { id: "srf-source-file-options" } });
+  const sourceList = sourceWrap.createEl("datalist", { attr: { id: sourceListId } });
   opts.sourceFiles.forEach((filePath) => {
     sourceList.createEl("option", { value: filePath });
   });
@@ -99,6 +100,8 @@ export function renderFilterBar(container: HTMLElement, opts: FilterBarOptions):
 
   return shell;
 }
+
+let filterBarInstanceId = 0;
 
 function createField(
   container: HTMLElement,

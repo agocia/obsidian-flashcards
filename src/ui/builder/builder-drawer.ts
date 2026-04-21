@@ -120,8 +120,13 @@ export class BuilderDrawer {
 
     const body = drawer.createDiv({ cls: "srf-builder-drawer__body" });
 
-    const sourceCard = body.createDiv({ cls: "srf-panel srf-builder-drawer__source-card" });
-    sourceCard.createEl("h3", { cls: "srf-builder-drawer__col-heading", text: "Source" });
+    const sourceCard = body.createEl("details", { cls: "srf-panel srf-builder-drawer__source-card" });
+    sourceCard.createEl("summary", {
+      cls: "srf-builder-drawer__source-summary",
+      text: this.selectionContext
+        ? `Source context · ${this.selectionContext.noteTitle}`
+        : "Source context",
+    });
     if (this.selectionContext) {
       sourceCard.createDiv({
         cls: "srf-builder-drawer__source-note",

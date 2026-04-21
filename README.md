@@ -234,3 +234,14 @@ The built plugin artifacts are:
 - `styles.css`
 
 Those are the files Obsidian needs inside `.obsidian/plugins/obsidian-flashcards/`.
+
+## Local Obsidian deployment note
+
+Obsidian does not run files from `src/` directly. During development, visible changes require both steps:
+
+```bash
+npm run build
+cp main.js styles.css manifest.json "<your-vault>/.obsidian/plugins/obsidian-flashcards/"
+```
+
+Then reload Obsidian or disable and re-enable the plugin. If `src/` changes but the vault plugin folder still has the old `main.js` or `styles.css`, the Obsidian UI will look unchanged.
