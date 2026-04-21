@@ -1,0 +1,59 @@
+/* ─── CSS Custom Properties / Design Tokens ──────────────────────────────────
+   Prefix: --srf-
+   Light theme (default) | Dark theme via .theme-dark
+─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+.theme-light {
+  --srf-bg-primary:            var(--background-primary, #FFFFFF);
+  --srf-bg-secondary:          var(--background-secondary, #F6F7F8);
+  --srf-surface-primary:       var(--background-primary, #FFFFFF);
+  --srf-surface-elevated:      var(--background-primary, #FFFFFF);
+  --srf-surface-tint:          var(--background-modifier-hover, #F1F3F5);
+  --srf-text-primary:          var(--text-normal, #1F2328);
+  --srf-text-secondary:        var(--text-muted, #59636E);
+  --srf-text-tertiary:         var(--text-faint, #7D8590);
+  --srf-border-subtle:         var(--background-modifier-border, #D0D7DE);
+  --srf-accent-primary:        var(--interactive-accent, #2563EB);
+  --srf-accent-primary-hover:  var(--interactive-accent-hover, #1D4ED8);
+  --srf-accent-soft:           color-mix(in srgb, var(--interactive-accent, #2563EB) 12%, transparent);
+  --srf-success:               var(--color-green, #1A7F37);
+  --srf-warning:               var(--color-orange, #B45309);
+  --srf-danger:                var(--color-red, #CF222E);
+  --srf-info:                  var(--color-blue, #0969DA);
+  --srf-shadow-color:          rgba(31, 35, 40, 0.10);
+
+  --srf-shadow-xs: 0 1px 2px rgba(31,35,40,0.06);
+  --srf-shadow-sm: 0 4px 12px rgba(31,35,40,0.08);
+  --srf-shadow-md: 0 10px 30px rgba(31,35,40,0.12);
+  --srf-shadow-lg: 0 20px 40px rgba(31,35,40,0.18);
+
+  --srf-chrome-bg: color-mix(in srgb, var(--background-primary, #FFFFFF) 88%, transparent);
+}
+
+.theme-dark {
+  --srf-bg-primary:            var(--background-primary, #1E1E1E);
+  --srf-bg-secondary:          var(--background-secondary, #262626);
+  --srf-surface-primary:       var(--background-primary, #1E1E1E);
+  --srf-surface-elevated:      var(--background-secondary, #262626);
+  --srf-surface-tint:          var(--background-modifier-hover, #303030);
+  --srf-text-primary:          var(--text-normal, #E6EDF3);
+  --srf-text-secondary:        var(--text-muted, #B7BDC5);
+  --srf-text-tertiary:         var(--text-faint, #848D97);
+  --srf-border-subtle:         var(--background-modifier-border, #3D444D);
+  --srf-accent-primary:        var(--interactive-accent, #60A5FA);
+  --srf-accent-primary-hover:  var(--interactive-accent-hover, #93C5FD);
+  --srf-accent-soft:           color-mix(in srgb, var(--interactive-accent, #60A5FA) 18%, transparent);
+  --srf-success:               var(--color-green, #56D364);
+  --srf-warning:               var(--color-orange, #E3B341);
+  --srf-danger:                var(--color-red, #F85149);
+  --srf-info:                  var(--color-blue, #79C0FF);
+  --srf-shadow-color:          rgba(0, 0, 0, 0.32);
+
+  --srf-shadow-xs: 0 1px 2px rgba(0,0,0,0.16);
+  --srf-shadow-sm: 0 4px 12px rgba(0,0,0,0.20);
+  --srf-shadow-md: 0 10px 30px rgba(0,0,0,0.28);
+  --srf-shadow-lg: 0 20px 40px rgba(0,0,0,0.36);
+
+  --srf-chrome-bg: color-mix(in srgb, var(--background-primary, #1E1E1E) 88%, transparent);
+}

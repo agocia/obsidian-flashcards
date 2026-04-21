@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-flashcards",
+  "name": "Flash Cards",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Anki-class spaced repetition built into your notes. Create cards from selections, review on schedule, manage by deck and tag.",
+  "author": "obsidian-flashcards",
+  "authorUrl": "https://github.com/obsidian-flashcards",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
