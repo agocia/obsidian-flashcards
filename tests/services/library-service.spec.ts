@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { LibraryService } from "../../src/services/library-service";
 import { PluginDataRepository } from "../../src/data/plugin-data-repository";
-import { createDeck, createReviewCard } from "../../src/domain/models";
+import { createDeck, createReviewCard, type CardTemplateRecord, type ReviewCardRecord } from "../../src/domain/models";
 
 function makeRepo() {
   let stored: unknown = undefined;
@@ -21,6 +21,41 @@ const emptyQuery = {
   sortBy: "due" as const,
   sortDirection: "asc" as const,
 };
+
+function makeTemplate(
+  card: ReviewCardRecord,
+  overrides: Partial<CardTemplateRecord> = {}
+): CardTemplateRecord {
+  const now = new Date().toISOString();
+  return {
+    id: card.templateId,
+    kind: "basic",
+    deckId: "default",
+    tagIds: [],
+    sourceAnchor: {
+      filePath: "",
+      noteTitle: "",
+      startOffset: 0,
+      endOffset: 0,
+      selectedText: "",
+      leadingContext: "",
+      trailingContext: "",
+      excerpt: "",
+      contentHash: "",
+      lastResolvedAt: now,
+    },
+    frontMarkdown: card.promptMarkdown,
+    backMarkdown: card.answerMarkdown,
+    clozeMarkdown: null,
+    hintByClozeIndex: {},
+    customTemplateId: null,
+    generatedCardIds: [card.id],
+    createdAt: now,
+    updatedAt: now,
+    archived: false,
+    ...overrides,
+  };
+}
 
 describe("LibraryService.query", () => {
   let repo: PluginDataRepository;
@@ -123,6 +158,72 @@ describe("LibraryService.query", () => {
     const result = await service.query({ ...emptyQuery, sourceFile: "Cell" });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].sourceFile).toBe("folder/Cell.md");
+  });
+
+  it("returns editable markdown fields for each card", async () => {
+    const card = createReviewCard("t1", "forward", "**Question**", "Plain answer");
+    const template = makeTemplate(card, { kind: "basic" });
+    await repo.save((d) => ({ ...d, cards: [card], templates: [template] }));
+
+    const result = await service.query(emptyQuery);
+
+    expect(result.rows[0]).toMatchObject({
+      cardId: card.id,
+      variantKey: "forward",
+      templateKind: "basic",
+      promptMarkdown: "**Question**",
+      answerMarkdown: "Plain answer",
+      promptText: "Question",
+      answerText: "Plain answer",
+    });
+  });
+});
+
+describe("LibraryService.editCard", () => {
+  let repo: PluginDataRepository;
+  let service: LibraryService;
+
+  beforeEach(async () => {
+    repo = makeRepo();
+    await repo.load();
+    service = new LibraryService(repo);
+  });
+
+  it("updates card markdown and searchable text", async () => {
+    const card = createReviewCard("t1", "forward", "Old prompt", "Old answer");
+    const template = makeTemplate(card);
+    await repo.save((d) => ({ ...d, cards: [card], templates: [template] }));
+
+    await service.editCard({
+      cardId: card.id,
+      promptMarkdown: "New **prompt**",
+      answerMarkdown: "New `answer`",
+    });
+
+    const snap = repo.snapshot();
+    expect(snap.cards[0]).toMatchObject({
+      promptMarkdown: "New **prompt**",
+      answerMarkdown: "New `answer`",
+      promptText: "New prompt",
+      answerText: "New answer",
+    });
+    expect(snap.templates[0]).toMatchObject({
+      frontMarkdown: "New **prompt**",
+      backMarkdown: "New `answer`",
+    });
+  });
+
+  it("rejects blank prompts", async () => {
+    const card = createReviewCard("t1", "forward", "Old prompt", "Old answer");
+    await repo.save((d) => ({ ...d, cards: [card] }));
+
+    await expect(
+      service.editCard({
+        cardId: card.id,
+        promptMarkdown: "   ",
+        answerMarkdown: "Answer",
+      })
+    ).rejects.toThrow(/CardPromptRequiredError/);
   });
 });
 

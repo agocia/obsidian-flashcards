@@ -637,12 +637,7 @@
 
 .srf-library__content {
   padding: 16px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--srf-accent-primary) 4%, var(--srf-surface-glass)),
-      var(--srf-surface-glass) 220px
-    );
+  background: var(--srf-surface-glass);
 }
 
 .srf-library__filter-bar {
@@ -653,8 +648,8 @@
 }
 
 .srf-library__filter-bar .srf-filter-shell {
-  border-color: color-mix(in srgb, var(--srf-accent-primary) 18%, var(--srf-border-subtle));
-  background: color-mix(in srgb, var(--srf-accent-primary) 5%, var(--srf-surface-elevated));
+  border-color: var(--srf-border-subtle);
+  background: color-mix(in srgb, var(--srf-surface-elevated) 78%, transparent);
 }
 
 .srf-library__directory {
@@ -662,9 +657,9 @@
   gap: 10px;
   margin: 0 0 16px;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--srf-success) 20%, var(--srf-border-subtle));
+  border: 1px solid var(--srf-border-subtle);
   border-radius: var(--srf-radius-lg);
-  background: color-mix(in srgb, var(--srf-success) 5%, var(--srf-surface-elevated));
+  background: color-mix(in srgb, var(--srf-surface-elevated) 64%, transparent);
 }
 
 .srf-library__directory-header {
@@ -726,7 +721,7 @@
 }
 
 .srf-library__rename-deck-form {
-  border-top: 1px solid color-mix(in srgb, var(--srf-success) 22%, var(--srf-border-subtle));
+  border-top: 1px solid var(--srf-border-subtle);
   padding-top: 10px;
 }
 
@@ -735,11 +730,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin: 4px 0 14px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--srf-warning) 18%, var(--srf-border-subtle));
-  border-radius: var(--srf-radius-lg);
-  background: color-mix(in srgb, var(--srf-warning) 5%, var(--srf-surface-elevated));
+  margin: 4px 0 10px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid var(--srf-border-subtle);
+  background: transparent;
 }
 
 .srf-library__list-count {
@@ -785,7 +779,6 @@
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--srf-border-subtle);
-  border-left: 3px solid color-mix(in srgb, var(--srf-accent-primary) 30%, var(--srf-border-subtle));
   border-radius: var(--srf-radius-lg);
   background: color-mix(in srgb, var(--srf-surface-elevated) 82%, transparent);
   box-shadow: var(--srf-shadow-xs), var(--srf-inner-highlight);
@@ -845,7 +838,7 @@
 .srf-library-card__prompt {
   color: var(--srf-text-primary);
   font-size: 16px;
-  font-weight: 560;
+  font-weight: 520;
   letter-spacing: -0.02em;
   line-height: 1.35;
 }
@@ -871,6 +864,20 @@
   text-transform: capitalize;
 }
 
+.srf-library-card__header-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.srf-library-card__edit-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .srf-library-card__state--suspended {
   background: color-mix(in srgb, var(--srf-danger) 10%, transparent);
   color: var(--srf-danger);
@@ -886,6 +893,57 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.srf-library-card__answer-preview {
+  color: var(--srf-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.srf-library-card__edit-form {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--srf-border-subtle);
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-surface-primary) 72%, transparent);
+}
+
+.srf-library-card__edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.srf-library-card__edit-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.srf-library-card__edit-label {
+  color: var(--srf-text-tertiary);
+  font-size: 10px;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.srf-library-card__edit-textarea {
+  min-height: 106px;
+  resize: vertical;
+}
+
+.srf-library-card__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .srf-library-card__empty-meta {
@@ -935,30 +993,35 @@
 }
 
 .srf-library__bulk-host {
-  position: static;
-  z-index: 20;
+  position: sticky;
+  top: 8px;
+  z-index: 24;
   pointer-events: auto;
+  margin: 0 0 12px;
+}
+
+.srf-library__bulk-host:empty {
+  display: none;
 }
 
 .srf-library__bulk-bar {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: minmax(180px, 0.72fr) minmax(0, 1.5fr);
-  gap: 12px;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  gap: 8px 12px;
   align-items: center;
-  margin-top: 14px;
-  padding: 12px;
+  padding: 8px 10px;
   border: 1px solid var(--srf-border-strong);
-  border-radius: var(--srf-radius-lg);
+  border-radius: var(--srf-radius-md);
   background: var(--srf-surface-glass);
-  box-shadow: var(--srf-shadow-sm), var(--srf-inner-highlight);
+  box-shadow: var(--srf-shadow-xs), var(--srf-inner-highlight);
   backdrop-filter: blur(14px) saturate(1.05);
 }
 
 .srf-library__bulk-title {
   color: var(--srf-text-primary);
-  font-size: 14px;
-  font-weight: 560;
+  font-size: 13px;
+  font-weight: 520;
 }
 
 .srf-library__bulk-meta {
@@ -971,8 +1034,14 @@
 .srf-library__bulk-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.srf-library__bulk-actions .srf-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .srf-library__bulk-editor {
@@ -981,10 +1050,10 @@
   grid-template-columns: minmax(160px, 1fr) auto;
   gap: 10px;
   align-items: end;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--srf-border-subtle);
-  border-radius: var(--srf-radius-lg);
-  background: var(--srf-surface-tint);
+  border-radius: var(--srf-radius-md);
+  background: color-mix(in srgb, var(--srf-surface-elevated) 72%, transparent);
 }
 
 .srf-library__bulk-editor-label {
@@ -1732,6 +1801,19 @@
   }
 
   .srf-library-card {
+    grid-template-columns: 1fr;
+  }
+
+  .srf-library-card__header {
+    flex-direction: column;
+  }
+
+  .srf-library-card__header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .srf-library-card__edit-grid {
     grid-template-columns: 1fr;
   }
 

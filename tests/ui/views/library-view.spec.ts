@@ -86,7 +86,12 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
 function makeRow(overrides: Partial<LibraryRow> = {}): LibraryRow {
   return {
     cardId: "card-1",
+    variantKey: "forward",
+    templateKind: "basic",
+    promptMarkdown: "What is spaced repetition?",
+    answerMarkdown: "Reviewing information at expanding intervals.",
     promptText: "What is spaced repetition?",
+    answerText: "Reviewing information at expanding intervals.",
     deckName: "Default",
     tags: ["biology"],
     sourceNoteTitle: "Cell",
@@ -156,6 +161,111 @@ describe("LibraryView", () => {
       cardIds: ["card-suspended"],
       suspended: false,
     });
+  });
+
+  it("keeps the selected-card action tray above the card list", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const service = {
+      query: vi.fn().mockResolvedValue({
+        total: 1,
+        rows: [makeRow()],
+      }),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const bulkHost = container.querySelector(".srf-library__bulk-host") as HTMLElement;
+    const list = container.querySelector(".srf-library__list") as HTMLElement;
+
+    expect(bulkHost).toBeDefined();
+    expect(list).toBeDefined();
+    expect(
+      Boolean(bulkHost.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING)
+    ).toBe(true);
+  });
+
+  it("edits a card inline from the library", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    let row = makeRow({
+      cardId: "card-edit",
+      promptMarkdown: "Old **Prompt**",
+      answerMarkdown: "Old answer",
+      promptText: "Old Prompt",
+      answerText: "Old answer",
+    });
+    const service = {
+      query: vi.fn().mockImplementation(async () => ({
+        total: 1,
+        rows: [row],
+      })),
+      bulkUpdate: vi.fn().mockResolvedValue({ updatedCount: 0 }),
+      editCard: vi.fn().mockImplementation(
+        async (input: { cardId: string; promptMarkdown: string; answerMarkdown: string }) => {
+          row = {
+            ...row,
+            promptMarkdown: input.promptMarkdown,
+            answerMarkdown: input.answerMarkdown,
+            promptText: "New Prompt",
+            answerText: "New answer",
+          };
+          return { updatedCard: { id: input.cardId } };
+        }
+      ),
+    };
+
+    const view = new LibraryView(
+      container,
+      service as any,
+      [{ id: "default", name: "Default" }],
+      [],
+      []
+    );
+
+    await view.render();
+
+    const editButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Edit"
+    ) as HTMLButtonElement | undefined;
+    editButton?.click();
+    await flushDom();
+
+    const textareas = Array.from(
+      container.querySelectorAll(".srf-library-card__edit-textarea")
+    ) as HTMLTextAreaElement[];
+    textareas[0].value = "New **Prompt**";
+    textareas[0].dispatchEvent(new Event("input", { bubbles: true }));
+    textareas[1].value = "New answer";
+    textareas[1].dispatchEvent(new Event("input", { bubbles: true }));
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Save changes"
+    ) as HTMLButtonElement | undefined;
+    saveButton?.click();
+    await flushDom();
+
+    expect(service.editCard).toHaveBeenCalledWith({
+      cardId: "card-edit",
+      promptMarkdown: "New **Prompt**",
+      answerMarkdown: "New answer",
+    });
+    expect(container.textContent).toContain("New Prompt");
   });
 
   it("reloads library filter metadata on every render", async () => {

@@ -1,10 +1,13 @@
 import type { PluginDataRepository } from "../data/plugin-data-repository";
 import type {
+  CardKind,
+  CardTemplateRecord,
   DeckRecord,
+  ReviewCardRecord,
   ReviewCardState,
   TagRecord,
 } from "../domain/models";
-import { nowIso, createDeck, createTag } from "../domain/models";
+import { nowIso, createDeck, createTag, stripMarkdown } from "../domain/models";
 
 // ─── I/O types ────────────────────────────────────────────────────────────────
 
@@ -22,7 +25,12 @@ export interface LibraryQueryInput {
 
 export interface LibraryRow {
   cardId: string;
+  variantKey: string;
+  templateKind: CardKind | null;
+  promptMarkdown: string;
+  answerMarkdown: string;
   promptText: string;
+  answerText: string;
   deckName: string;
   tags: string[];
   sourceNoteTitle: string;
@@ -45,6 +53,16 @@ export interface CreateDeckInput {
 export interface RenameDeckInput {
   deckId: string;
   name: string;
+}
+
+export interface EditCardInput {
+  cardId: string;
+  promptMarkdown: string;
+  answerMarkdown: string;
+}
+
+export interface EditCardResult {
+  updatedCard: ReviewCardRecord;
 }
 
 export type BulkUpdateCardsInput =
@@ -125,6 +143,58 @@ export class LibraryService {
     return renamed;
   }
 
+  async editCard(input: EditCardInput): Promise<EditCardResult> {
+    const promptMarkdown = input.promptMarkdown.trim();
+    const answerMarkdown = input.answerMarkdown.trim();
+    if (!promptMarkdown) {
+      throw new Error("CardPromptRequiredError: card prompt is required");
+    }
+
+    const now = nowIso();
+    let originalCard: ReviewCardRecord | null = null;
+    let updatedCard: ReviewCardRecord | null = null;
+
+    await this.repository.save((data) => {
+      originalCard = data.cards.find((card) => card.id === input.cardId) ?? null;
+      if (!originalCard) {
+        throw new Error("CardNotFoundError: card does not exist");
+      }
+
+      const cards = data.cards.map((card) => {
+        if (card.id !== input.cardId) return card;
+        updatedCard = {
+          ...card,
+          promptMarkdown,
+          answerMarkdown,
+          promptText: stripMarkdown(promptMarkdown),
+          answerText: stripMarkdown(answerMarkdown),
+          updatedAt: now,
+        };
+        return updatedCard;
+      });
+
+      const templates = data.templates.map((template) =>
+        originalCard && template.id === originalCard.templateId
+          ? syncTemplateForSingleCardEdit(
+              template,
+              originalCard,
+              promptMarkdown,
+              answerMarkdown,
+              now
+            )
+          : template
+      );
+
+      return { ...data, cards, templates };
+    });
+
+    if (!updatedCard) {
+      throw new Error("CardEditError: could not edit card");
+    }
+
+    return { updatedCard };
+  }
+
   async query(input: LibraryQueryInput): Promise<LibraryQueryResult> {
     const data = await this.repository.load();
 
@@ -178,7 +248,12 @@ export class LibraryService {
 
       rows.push({
         cardId: card.id,
+        variantKey: card.variantKey,
+        templateKind: template?.kind ?? null,
+        promptMarkdown: card.promptMarkdown,
+        answerMarkdown: card.answerMarkdown,
         promptText: card.promptText,
+        answerText: card.answerText,
         deckName: deckMap.get(effectiveDeckId) ?? effectiveDeckId,
         tags: effectiveTagIds.map((id) => tagMap.get(id) ?? id),
         sourceNoteTitle: effectiveSourceNoteTitle,
@@ -324,6 +399,26 @@ function compareNullable<T extends string | number>(
   if (a === null) return 1;
   if (b === null) return -1;
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function syncTemplateForSingleCardEdit(
+  template: CardTemplateRecord,
+  card: ReviewCardRecord,
+  promptMarkdown: string,
+  answerMarkdown: string,
+  updatedAt: string
+): CardTemplateRecord {
+  const ownsOnlyThisCard =
+    template.generatedCardIds.length === 1 && template.generatedCardIds[0] === card.id;
+  if (!ownsOnlyThisCard) return template;
+  if (template.kind !== "basic" && template.kind !== "custom") return template;
+
+  return {
+    ...template,
+    frontMarkdown: promptMarkdown,
+    backMarkdown: answerMarkdown,
+    updatedAt,
+  };
 }
 
 function ensureTags(
